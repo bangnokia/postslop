@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, PLATFORM_NAMES, PLATFORMS, type NewImage, type Platform, type Post, type PostInput } from "../api";
+import { api, ApiError, inFlight, PLATFORM_NAMES, PLATFORMS, type NewImage, type Platform, type Post, type PostInput } from "../api";
 import { Icon } from "../components/icons";
 import { blankDraft, length, loadDraft, prepareImage, saveDraft, toIso, toLocalInput, uuid, when, type LocalDraft } from "../compose";
 import { PageHeader, useShell } from "../shell";
@@ -173,7 +173,7 @@ export function Composer({ editing, at, accounts, onDone }: { editing?: string; 
   async function finish(post: Post) {
     postsChanged();
     const link = { href: `#/posts/${post.id}`, label: "View post" };
-    if (post.status === "queued") {
+    if (inFlight(post)) {
       // Handed to the queue: free the composer now; the shell reports the result when it arrives.
       shell.track(post);
       shell.toast({ tone: "info", text: "Publishing in the background.", link });

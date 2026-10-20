@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-use App\Jobs\PublishPost;
+use App\Jobs\PublishDelivery;
 use App\PrivateFiles;
 use App\Social\ImageAttachment;
 use App\Social\Publisher;
@@ -25,6 +25,8 @@ final readonly class Publishing
 {
     private const string ACCOUNTS = 'postslop.accounts';
     private const array EDITABLE = ['draft', 'scheduled'];
+    // A delivery waiting longer than this was never picked up, so it is failed: nothing was sent.
+    private const int STALE_SECONDS = 900;
     private const array EXTENSIONS = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
 
     /**
@@ -280,19 +282,15 @@ final readonly class Publishing
     }
 
     /**
-     * Marks a draft or a scheduled post as queued and pushes the job that publishes it, in one transaction, so
-     * the job exists exactly when the queued post does. A post already on its way is returned as it is.
+     * Hands each destination of a draft or a scheduled post to its site's own queue, in one transaction, so every
+     * job exists exactly when its delivery does. The sites then send at the same time, each one post after
+     * another. A post already on its way is returned as it is.
      */
     public function queue(string $id): array
     {
         $this->db->transaction(function (Connection $tx) use ($id): void {
-            $queued = $tx
-                ->table('posts')
-                ->where('id', $id)
-                ->whereIn('status', self::EDITABLE)
-                ->update(['status' => 'queued', 'updated_at' => self::now()]);
-            if ($queued > 0) {
-                $this->queue->within($tx)->push(PublishPost::class, id: $id);
+            foreach (self::claim($tx, $id) as $platform) {
+                $this->queue->within($tx)->on($platform)->push(PublishDelivery::class, id: $id, platform: $platform);
             }
         });
         return $this->find($id);
@@ -331,39 +329,16 @@ final readonly class Publishing
     }
 
     /**
-     * Sends a draft or a scheduled post to each of its destinations, once.
+     * Sends a draft or a scheduled post to each of its destinations, once, in this process: the command line's
+     * --now. Each site is still sent one post at a time, beside the queue's workers.
      */
     public function publish(string $id): array
     {
-        $lock = $this->lock();
-        try {
-            $post = $this->row($id) ?? throw Failure::notFound();
-            if (!in_array($post['status'], [...self::EDITABLE, 'queued'], true)) {
-                return $this->find($id);
-            }
-            $platforms = json_decode($post['platforms'], true, flags: JSON_THROW_ON_ERROR);
-            $this->db->transaction(static function (Connection $tx) use ($id, $platforms): void {
-                $tx->table('posts')->where('id', $id)->update(['status' => 'publishing', 'updated_at' => self::now()]);
-                foreach ($platforms as $position => $platform) {
-                    $tx->table('deliveries')->insert([
-                        'post_id' => $id,
-                        'position' => $position,
-                        'platform' => $platform,
-                        'status' => 'failed',
-                        'result' => self::encode([
-                            'platform' => $platform,
-                            'status' => 'failed',
-                            'error' => 'Publishing did not start for this destination. No post was submitted.',
-                        ]),
-                        'updated_at' => self::now(),
-                    ]);
-                }
-            });
-            $this->send($post, $platforms);
-            return $this->find($id);
-        } finally {
-            self::unlock($lock);
+        $platforms = $this->db->transaction(static fn(Connection $tx): array => self::claim($tx, $id));
+        foreach ($platforms as $platform) {
+            $this->deliver($id, $platform);
         }
+        return $this->find($id);
     }
 
     /**
@@ -372,13 +347,12 @@ final readonly class Publishing
      */
     public function retry(string $id): array
     {
-        $lock = $this->lock();
-        try {
-            $post = $this->row($id) ?? throw Failure::notFound();
+        $failed = $this->db->transaction(static function (Connection $tx) use ($id): array {
+            $post = $tx->table('posts')->where('id', $id)->first() ?? throw Failure::notFound();
             if (in_array($post['status'], [...self::EDITABLE, 'queued', 'publishing'], true)) {
                 throw Failure::invalid('This post has not finished publishing.');
             }
-            $failed = $this->db
+            $failed = $tx
                 ->table('deliveries')
                 ->where('post_id', $id)
                 ->where('status', 'failed')
@@ -389,27 +363,108 @@ final readonly class Publishing
                     'No destination failed. Unknown results are never retried; check the account instead.',
                 );
             }
-            $this->db
-                ->table('posts')
-                ->where('id', $id)
-                ->update(['status' => 'publishing', 'updated_at' => self::now()]);
-            $this->send($post, $failed);
-            return $this->find($id);
+            $tx->table('posts')->where('id', $id)->update(['status' => 'publishing', 'updated_at' => self::now()]);
+            foreach ($failed as $platform) {
+                $tx
+                    ->table('deliveries')
+                    ->where('post_id', $id)
+                    ->where('platform', $platform)
+                    ->update([
+                        'status' => 'queued',
+                        'result' => self::encode(['platform' => $platform, 'status' => 'queued']),
+                        'updated_at' => self::now(),
+                    ]);
+            }
+            return $failed;
+        });
+        foreach ($failed as $platform) {
+            $this->deliver($id, $platform);
+        }
+        return $this->find($id);
+    }
+
+    /**
+     * Sends one destination of a post, if it is still waiting to be sent, while holding that site's lock: a
+     * site gets one post at a time, and different sites send at the same time. Safe to run twice.
+     */
+    public function deliver(string $id, string $platform): void
+    {
+        $lock = $this->siteLock($platform);
+        try {
+            // Taking the delivery from "queued" to "sending" is one write, so only one sender ever gets it. It is
+            // stored before any remote call: a crash leaves it unknown, never sent again.
+            $taken = $this->db
+                ->table('deliveries')
+                ->where('post_id', $id)
+                ->where('platform', $platform)
+                ->where('status', 'queued')
+                ->update([
+                    'status' => 'sending',
+                    'result' => self::encode([
+                        'platform' => $platform,
+                        'status' => 'sending',
+                        'error' => 'Publishing started but no result was recorded. Check the account before sending again.',
+                    ]),
+                    'updated_at' => self::now(),
+                ]);
+            if ($taken === 0) {
+                return;
+            }
+            $post = $this->row($id) ?? throw Failure::notFound();
+            $result = $this->sessions->enabled($platform)
+                ? $this->send($id, $platform, $post['text'])
+                : [
+                    'platform' => $platform,
+                    'status' => 'failed',
+                    'error' => 'This account is turned off in Postslop. Nothing was posted; turn it on and retry.',
+                ];
+            $this->record($id, $platform, $result);
         } finally {
             self::unlock($lock);
+        }
+        $this->cache->delete(self::ACCOUNTS);
+        $this->settle($this->row($id) ?? throw Failure::notFound());
+    }
+
+    private function send(string $id, string $platform, string $text): array
+    {
+        try {
+            return $this->publishers[$platform]->publish($id, $text, $this->images($id));
+        } catch (\Throwable) {
+            return [
+                'platform' => $platform,
+                'status' => 'unknown',
+                'error' => 'Publishing was interrupted. Check the account before sending again.',
+            ];
         }
     }
 
     /**
-     * Publishes every scheduled post that is due, oldest first, and any queued post whose job could not send it,
-     * such as one that found another publication holding the lock.
+     * Publishes every scheduled post that is due, oldest first, in this process: the command line's run-due.
      *
      * @return list<array>
      */
     public function runDue(?\DateTimeImmutable $now = null): array
     {
+        return array_map($this->publish(...), $this->due($now));
+    }
+
+    /**
+     * Hands every scheduled post that is due to the queue, as the schedule does each minute, and any post still
+     * marked queued by an earlier version.
+     *
+     * @return list<array>
+     */
+    public function queueDue(?\DateTimeImmutable $now = null): array
+    {
+        return array_map($this->queue(...), $this->due($now));
+    }
+
+    /** @return list<string> */
+    private function due(?\DateTimeImmutable $now): array
+    {
         $now ??= new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $due = [
+        return [
             ...$this->db->table('posts')->where('status', 'queued')->orderBy('updated_at')->pluck('id'),
             ...$this->db
                 ->table('posts')
@@ -418,19 +473,43 @@ final readonly class Publishing
                 ->orderBy('scheduled_at')
                 ->pluck('id'),
         ];
-        $published = [];
-        foreach ($due as $id) {
-            try {
-                $published[] = $this->publish($id);
-            } catch (Failure $failure) {
-                if ($failure->kind === Failure::BUSY) {
-                    // Another publication holds the lock; the next run picks these up.
-                    break;
-                }
-                throw $failure;
+    }
+
+    /**
+     * Marks a draft or a scheduled post as publishing, with every destination waiting to be sent, and returns
+     * them; none when the post is already on its way.
+     *
+     * @return list<string>
+     */
+    private static function claim(Connection $tx, string $id): array
+    {
+        $claimed = $tx
+            ->table('posts')
+            ->where('id', $id)
+            ->whereIn('status', [...self::EDITABLE, 'queued'])
+            ->update(['status' => 'publishing', 'updated_at' => self::now()]);
+        if ($claimed === 0) {
+            if ($tx->table('posts')->where('id', $id)->first() === null) {
+                throw Failure::notFound();
             }
+            return [];
         }
-        return $published;
+        $platforms = json_decode(
+            (string) $tx->table('posts')->where('id', $id)->value('platforms'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        foreach ($platforms as $position => $platform) {
+            $tx->table('deliveries')->insert([
+                'post_id' => $id,
+                'position' => $position,
+                'platform' => $platform,
+                'status' => 'queued',
+                'result' => self::encode(['platform' => $platform, 'status' => 'queued']),
+                'updated_at' => self::now(),
+            ]);
+        }
+        return $platforms;
     }
 
     public function find(string $id): array
@@ -526,40 +605,6 @@ final readonly class Publishing
         return ['mimeType' => $row['mime_type'], 'path' => $this->mediaPath($row)];
     }
 
-    private function send(array $post, array $platforms): void
-    {
-        $images = $this->images($post['id']);
-        foreach ($platforms as $platform) {
-            // Persist uncertainty before any remote side effect, so a crash or
-            // repeated Enter can never silently publish the same request twice.
-            $this->record($post['id'], $platform, [
-                'platform' => $platform,
-                'status' => 'unknown',
-                'error' => 'Publishing started but no result was recorded. Check the account before sending again.',
-            ]);
-            if (!$this->sessions->enabled($platform)) {
-                $this->record($post['id'], $platform, [
-                    'platform' => $platform,
-                    'status' => 'failed',
-                    'error' => 'This account is turned off in Postslop. Nothing was posted; turn it on and retry.',
-                ]);
-                continue;
-            }
-            try {
-                $result = $this->publishers[$platform]->publish($post['id'], $post['text'], $images);
-            } catch (\Throwable) {
-                $result = [
-                    'platform' => $platform,
-                    'status' => 'unknown',
-                    'error' => 'Publishing was interrupted. Check the account before sending again.',
-                ];
-            }
-            $this->record($post['id'], $platform, $result);
-        }
-        $this->settle($this->row($post['id']), force: true);
-        $this->cache->delete(self::ACCOUNTS);
-    }
-
     private function record(string $id, string $platform, array $result): void
     {
         $status = in_array($result['status'] ?? null, ['published', 'failed', 'unknown'], true)
@@ -577,21 +622,19 @@ final readonly class Publishing
     }
 
     /**
-     * Stores the outcome its deliveries add up to. A post left "publishing" by a
-     * crash settles once no publication holds the lock.
+     * Stores the outcome its deliveries add up to, once none is waiting or being sent. A delivery left "sending"
+     * by a crash, its site's lock free, becomes unknown; one left waiting far longer than any queue takes failed,
+     * since it was never sent.
      */
-    // A forced settle is the publisher's own final write, made while it holds the lock.
-    // @mago-expect lint:no-boolean-flag-parameter
-    private function settle(array $post, bool $force = false): array
+    private function settle(array $post): array
     {
-        if ($post['status'] === 'publishing' && !$force) {
-            $lock = $this->tryLock();
-            if ($lock === null) {
-                return $post;
-            }
-            self::unlock($lock);
+        if ($post['status'] === 'publishing') {
+            $this->recover($post['id']);
         }
         $states = $this->db->table('deliveries')->where('post_id', $post['id'])->pluck('status');
+        if (array_intersect($states, ['queued', 'sending']) !== []) {
+            return $post;
+        }
         $published = count(array_keys($states, 'published', true));
         $status = match (true) {
             $published > 0 && $published === count($states) => 'published',
@@ -608,6 +651,49 @@ final readonly class Publishing
         }
         $this->db->table('posts')->where('id', $post['id'])->update($changes);
         return [...$post, ...$changes];
+    }
+
+    private function recover(string $id): void
+    {
+        $stale = gmdate('Y-m-d\TH:i:s\Z', time() - self::STALE_SECONDS);
+        foreach ($this->db->table('deliveries')->where('post_id', $id)->get() as $delivery) {
+            if ($delivery['status'] === 'queued' && $delivery['updated_at'] < $stale) {
+                $this->db
+                    ->table('deliveries')
+                    ->where('id', $delivery['id'])
+                    ->where('status', 'queued')
+                    ->update([
+                        'status' => 'failed',
+                        'result' => self::encode([
+                            'platform' => $delivery['platform'],
+                            'status' => 'failed',
+                            'error' => 'Publishing did not start for this destination. No post was submitted.',
+                        ]),
+                        'updated_at' => self::now(),
+                    ]);
+            }
+            if ($delivery['status'] !== 'sending') {
+                continue;
+            }
+            $lock = $this->trySiteLock($delivery['platform']);
+            if ($lock === null) {
+                continue;
+            }
+            $this->db
+                ->table('deliveries')
+                ->where('id', $delivery['id'])
+                ->where('status', 'sending')
+                ->update([
+                    'status' => 'unknown',
+                    'result' => self::encode([
+                        'platform' => $delivery['platform'],
+                        'status' => 'unknown',
+                        'error' => 'Publishing was interrupted. Check the account before sending again.',
+                    ]),
+                    'updated_at' => self::now(),
+                ]);
+            self::unlock($lock);
+        }
     }
 
     /**
@@ -731,23 +817,21 @@ final readonly class Publishing
     /**
      * @return resource
      */
-    private function lock(): mixed
+    /** Waits for the site's lock: one post at a time per site. */
+    private function siteLock(string $platform): mixed
     {
-        return $this->tryLock() ?? throw Failure::busy();
+        $lock = $this->openSiteLock($platform);
+        if (!flock($lock, LOCK_EX)) {
+            fclose($lock);
+            throw new \RuntimeException('Could not take the publishing lock.');
+        }
+        return $lock;
     }
 
-    /**
-     * @return resource|null
-     */
-    private function tryLock(): mixed
+    /** The site's lock when no one is sending to it, else null. */
+    private function trySiteLock(string $platform): mixed
     {
-        PrivateFiles::directory(dirname($this->lockFile));
-        $path = $this->lockFile;
-        $lock = fopen($path, 'c');
-        if ($lock === false) {
-            throw new \RuntimeException('Could not open the publishing lock.');
-        }
-        chmod($path, 0o600);
+        $lock = $this->openSiteLock($platform);
         if (!flock($lock, LOCK_EX | LOCK_NB)) {
             fclose($lock);
             return null;
@@ -755,9 +839,20 @@ final readonly class Publishing
         return $lock;
     }
 
-    /**
-     * @param resource $lock
-     */
+    /** @return resource */
+    private function openSiteLock(string $platform): mixed
+    {
+        PrivateFiles::directory(dirname($this->lockFile));
+        // storage/publishing.lock is the pattern: storage/publishing-x.lock, storage/publishing-bluesky.lock, …
+        $path = preg_replace('/\.lock$/D', '', $this->lockFile) . '-' . $platform . '.lock';
+        $lock = fopen($path, 'c');
+        if ($lock === false) {
+            throw new \RuntimeException('Could not open the publishing lock.');
+        }
+        chmod($path, 0o600);
+        return $lock;
+    }
+
     private static function unlock(mixed $lock): void
     {
         flock($lock, LOCK_UN);

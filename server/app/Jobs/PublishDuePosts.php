@@ -17,6 +17,6 @@ final readonly class PublishDuePosts
 
     public function handle(): void
     {
-        $this->publishing->runDue();
+        $this->publishing->queueDue();
     }
 }

@@ -179,7 +179,7 @@ export function Results({ results }: { results: Result[] }) {
           <li key={result.platform} data-state={result.status}>
             <PlatformIcon platform={result.platform} size={18} />
             <span className="result-name">{PLATFORM_NAMES[result.platform]}</span>
-            <span className="result-detail">{result.status === "published" ? "Published" : (result.error ?? result.status)}</span>
+            <span className="result-detail">{result.status === "published" ? "Published" : result.status === "queued" ? "Waiting" : result.status === "sending" ? "Sending…" : (result.error ?? result.status)}</span>
             {url && (
               <a className="btn btn-ghost btn-sm" href={url} target="_blank" rel="noopener noreferrer">
                 View <Icon name="external" size={14} />

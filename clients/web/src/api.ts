@@ -38,7 +38,8 @@ export interface Accounts {
 
 export interface Result {
   platform: Platform;
-  status: "published" | "failed" | "unknown";
+  // Waiting on its site's queue, then being sent, until the site answers.
+  status: "queued" | "sending" | "published" | "failed" | "unknown";
   url?: string;
   error?: string;
 }

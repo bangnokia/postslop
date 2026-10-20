@@ -7,7 +7,8 @@ namespace App\Jobs;
 use App\Core\Publishing;
 
 /**
- * Publishes one queued post. Safe to run twice: the core sends a post only while it is still queued.
+ * Hands a post queued by an earlier version to its sites' queues. Safe to run twice: the core hands a post on only
+ * while it is still queued.
  */
 final readonly class PublishPost
 {
@@ -17,6 +18,6 @@ final readonly class PublishPost
 
     public function handle(string $id): void
     {
-        $this->publishing->publish($id);
+        $this->publishing->queue($id);
     }
 }

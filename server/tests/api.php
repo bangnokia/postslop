@@ -74,12 +74,18 @@ try {
     $later = new DateTimeImmutable('+1 day')->format(DATE_ATOM);
     $api->post('/api/v1/posts/' . $id . '/schedule', ['scheduledAt' => $later])->assertStatus(200)->assertJson('status', 'scheduled');
     $api->get('/api/v1/posts', ['status' => 'scheduled'])->assertStatus(200)->assertJson('posts.0.id', $id);
-    // Publishing answers at once as queued; the queue worker sends it.
-    $api->post('/api/v1/posts/' . $id . '/publish', [])->assertStatus(200)->assertJson('status', 'queued');
-    $api->post('/api/v1/posts/' . $id . '/publish', [])->assertStatus(200)->assertJson('status', 'queued');
+    // Publishing answers at once, with each destination waiting on its site's queue; that queue's worker sends it.
+    $api->post('/api/v1/posts/' . $id . '/publish', [])
+        ->assertStatus(200)
+        ->assertJson('status', 'publishing')
+        ->assertJson('results.0.status', 'queued');
+    $api->post('/api/v1/posts/' . $id . '/publish', [])->assertStatus(200)->assertJson('status', 'publishing');
     api_check($publisher->calls === 0, 'Queuing a post sent it before the queue ran');
     $consumer = $app->container->get(Consumer::class);
-    api_check($consumer->runNext() && !$consumer->runNext(), 'Publishing twice did not queue exactly one job');
+    api_check(
+        $consumer->runNext(['bluesky']) && !$consumer->runNext(['bluesky']) && !$consumer->runNext(),
+        'Publishing twice did not queue exactly one job, on the site\'s queue',
+    );
     $api->get('/api/v1/posts/' . $id)->assertStatus(200)->assertJson('status', 'published');
     api_check($publisher->calls === 1, 'Publishing a scheduled post did not send it once');
     $api->put('/api/v1/posts/' . $id, ['text' => 'too late', 'platforms' => ['bluesky']])
@@ -98,8 +104,8 @@ try {
     $api->get('/api/v1/posts/' . $removable['id'])->assertStatus(404);
 
     $now = $api->post('/api/v1/posts', ['text' => 'now', 'platforms' => ['bluesky']])->assertStatus(200)->json();
-    api_check($now['status'] === 'queued' && $publisher->calls === 1, 'Publishing now did not answer as queued');
-    $consumer->runNext();
+    api_check($now['status'] === 'publishing' && $publisher->calls === 1, 'Publishing now did not answer at once');
+    $consumer->runNext(['bluesky']);
     $api->get('/api/v1/posts/' . $now['id'])->assertJson('status', 'published');
     api_check($publisher->calls === 2, 'The queue did not publish the post');
     // The calendar range lists posts by when they went out or will, and leaves drafts out.
@@ -128,7 +134,7 @@ try {
         ->assertJson('platforms.0.available', false);
     $calls = $publisher->calls;
     $off = $api->post('/api/v1/posts', ['text' => 'off', 'platforms' => ['bluesky']])->assertStatus(200)->json();
-    $consumer->runNext();
+    $consumer->runNext(['bluesky']);
     $api->get('/api/v1/posts/' . $off['id'])->assertJson('status', 'failed');
     api_check($publisher->calls === $calls, 'A turned-off account was published to');
     $api->patch('/api/v1/accounts/bluesky', ['enabled' => true])->assertStatus(200)->assertJson('platforms.0.available', true);

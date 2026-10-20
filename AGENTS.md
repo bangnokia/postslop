@@ -29,5 +29,6 @@
 - Share clean destination URLs; remove all `utm_*` parameters and do not add campaign tracking parameters.
 - Publish scheduled posts through CrabPHP's own schedule and queue run by `serve`, never an OS crontab or launchd job.
 - Postslop may be installed on another machine: do not restrict the HTTP API to localhost; protect it with the access token (a password), `POSTSLOP_TOKEN` in `server/.env`, not a file in storage, entered once in the web client; with no token set, the web client and API are public.
-- Keep the web client responsive: publishing now over the HTTP API queues the post and answers at once; the queue worker sends it, and the client frees the composer and polls for the result. The CLI's `--now` stays synchronous for agents.
+- Keep the web client responsive: publishing now over the HTTP API queues the post and answers at once; the queue workers send it, and the client frees the composer and polls for the result. The CLI's `--now` stays synchronous for agents.
+- Give every site its own queue, worker and lock, so one post is sent to all its sites at the same time while each site gets one post at a time.
 - Record durable user conventions here when they are missing and follow them immediately.

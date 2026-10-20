@@ -7,11 +7,11 @@ Base URL: `http://127.0.0.1:8087`. When `POSTSLOP_TOKEN` is set in `server/.env`
 ## Posts and their lifecycle
 
 ```
-draft ──▶ scheduled ──▶ queued ──▶ publishing ──▶ published | partial | failed | unknown
+draft ──▶ scheduled ──▶ publishing ──▶ published | partial | failed | unknown
   └─────────────────────────▲   (publish now)
 ```
 
-Publishing never makes a request wait on the sites. `mode: "now"` and `POST …/publish` answer at once with the post `queued`, and the queue worker run by `postslop serve` sends it. Poll `GET /api/v1/posts/{id}` until the status is no longer `queued` or `publishing`. A queued post can no longer be edited or deleted. Any queued post the worker could not take, for example because another publication held the lock, goes out with the next scheduled minute.
+Publishing never makes a request wait on the sites. `mode: "now"` and `POST …/publish` answer at once with the post `publishing` and each result `queued`. Every site has its own queue and worker in `postslop serve`, so the sites are sent at the same time, each one post after another. A result goes `queued`, then `sending`, then its outcome. Poll `GET /api/v1/posts/{id}` until the status is no longer `queued` or `publishing`. A post on its way can no longer be edited or deleted. A result still `queued` after 15 minutes was never sent and becomes `failed`; one left `sending` by a crash becomes `unknown`. (`queued` as a post's status comes only from earlier versions.)
 
 A post is one piece of content for one or more destinations. Each destination has its own result: `published`, `failed` or `unknown`. The post's status adds them up: `published` when every destination published, `partial` when some did, `unknown` when any outcome is unknown, otherwise `failed`.
 
@@ -105,7 +105,7 @@ These work on drafts and scheduled posts only; a sent post's history cannot chan
 
 - `PUT /api/v1/posts/{id}` replaces the content, in the same shape as creating it. `mode` decides what happens next.
 - `POST /api/v1/posts/{id}/schedule` with `{"scheduledAt": "…"}` schedules or moves it, and with `null` returns it to the drafts.
-- `POST /api/v1/posts/{id}/publish` queues it to publish now and returns it as `queued`. On a post already queued or sent, it returns the post unchanged.
+- `POST /api/v1/posts/{id}/publish` hands it to the sites' queues and returns it as `publishing`. On a post already on its way or sent, it returns the post unchanged.
 - `DELETE /api/v1/posts/{id}` deletes it (204).
 
 ## Retry — `POST /api/v1/posts/{id}/retry`

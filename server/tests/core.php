@@ -119,17 +119,34 @@ try {
     );
     check($publishing->accounts()['platforms'][0]['handle'] === 'fixture', 'Handle normalization failed');
 
-    $lock = fopen($directory . '/publishing.lock', 'c');
+    // Each site has its own lock. A delivery left "sending" stays so while its site is busy, and becomes unknown,
+    // never sent again, once the site is free: the sender crashed.
+    $crashed = PostRequest::fromApi([...$payload, 'requestId' => '00000000-0000-4000-8000-000000000012']);
+    test_seed($app, $crashed->requestId, $crashed->fingerprint, [
+        ['platform' => 'x', 'status' => 'sending', 'error' => 'Publishing started.'],
+    ]);
+    $lock = fopen($directory . '/publishing-x.lock', 'c');
     flock($lock, LOCK_EX);
-    $busy = PostRequest::fromApi([...$payload, 'requestId' => '00000000-0000-4000-8000-000000000003']);
-    refused(fn() => $publishing->create($busy), Failure::BUSY);
-    check($publishing->find($busy->requestId)['status'] === 'draft', 'A busy publication lost the post');
+    check($publishing->find($crashed->requestId)['status'] === 'publishing', 'A delivery being sent was settled');
     flock($lock, LOCK_UN);
     fclose($lock);
+    check($publishing->find($crashed->requestId)['status'] === 'unknown', 'A crashed delivery was not made unknown');
+    $publishing->deliver($crashed->requestId, 'x');
+    check($publisher->calls === 2, 'A crashed delivery was sent again');
+    // A delivery waiting far longer than any queue takes was never sent, so it fails and can be retried.
+    $stuck = PostRequest::fromApi([...$payload, 'requestId' => '00000000-0000-4000-8000-000000000013']);
+    test_seed($app, $stuck->requestId, $stuck->fingerprint, [['platform' => 'x', 'status' => 'queued']]);
+    $db->table('deliveries')->where('post_id', $stuck->requestId)->update(['updated_at' => '2000-01-01T00:00:00Z']);
+    check($publishing->find($stuck->requestId)['status'] === 'failed', 'A stuck delivery was not failed');
+    check($publisher->calls === 2, 'Failing a stuck delivery sent it');
+
+    $busy = PostRequest::fromApi([...$payload, 'requestId' => '00000000-0000-4000-8000-000000000003']);
     check(
         $publishing->create($busy)['status'] === 'published' && $publisher->calls === 3,
-        'Repeating a busy request did not publish its saved draft',
+        'A post was not published',
     );
+    $publishing->deliver($busy->requestId, 'x');
+    check($publisher->calls === 3, 'A delivery was sent twice');
 
     refused(fn() => PostRequest::fromApi([...$payload, 'text' => '']), Failure::INVALID);
     refused(fn() => PostRequest::fromApi([...$payload, 'platforms' => ['x', 'x']]), Failure::INVALID);
@@ -177,7 +194,7 @@ try {
             $deliveries = $this->db->table('deliveries')->where('post_id', $requestId)->orderBy('position')->get();
             check(
                 array_column($deliveries, 'platform') === ['bluesky', 'x']
-                && array_column($deliveries, 'status') === ['unknown', 'failed'],
+                && array_column($deliveries, 'status') === ['sending', 'queued'],
                 'All destinations must be persisted before the first remote call',
             );
             check($images[0]->alt === 'Small fixture', 'A stored image lost its description');
@@ -242,7 +259,7 @@ try {
         check((fileperms($file) & 0o777) === 0o600, 'Stored images are not private');
     }
     echo
-        "Core checks passed: repeat/uncertain submission protection, crash recovery, locking, drafts, scheduling, failed-only retries, input validation, and private media.\n";
+        "Core checks passed: repeat/uncertain submission protection, crash recovery, per-site locking, drafts, scheduling, failed-only retries, input validation, and private media.\n";
 } finally {
     test_remove($directory);
 }
