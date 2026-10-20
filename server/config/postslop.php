@@ -6,7 +6,8 @@ return [
     'sessions_file' => env('POSTSLOP_SESSIONS_FILE', dirname(__DIR__) . '/storage/sessions.json'),
     'lock_file' => env('POSTSLOP_LOCK_FILE', dirname(__DIR__) . '/storage/publishing.lock'),
     'media_path' => env('POSTSLOP_MEDIA_PATH', dirname(__DIR__) . '/storage/media'),
-    'token_path' => env('POSTSLOP_TOKEN_PATH', dirname(__DIR__) . '/storage/client-token'),
+    // The access token, the web client's password; see AccessToken.
+    'token' => (string) env('POSTSLOP_TOKEN', ''),
     'x_transport' => env('POSTSLOP_X_TRANSPORT', 'browser'),
     'node_binary' => env(
         'POSTSLOP_NODE_BINARY',

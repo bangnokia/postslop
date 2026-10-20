@@ -19,10 +19,9 @@ function api_check(bool $condition, string $message): void
 
 $directory = sys_get_temp_dir() . '/postslop-api-' . bin2hex(random_bytes(6));
 $token = bin2hex(random_bytes(32));
-putenv('POSTSLOP_TOKEN_PATH=' . $directory . '/client-token');
+putenv('POSTSLOP_TOKEN=' . $token);
 putenv('APP_URL=http://127.0.0.1:8087');
 $app = test_app($directory);
-file_put_contents($directory . '/client-token', $token . "\n");
 $publisher = new class implements Publisher {
     public int $calls = 0;
 

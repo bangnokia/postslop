@@ -9,7 +9,7 @@ import uuid
 root = Path(__file__).resolve().parents[1]
 base = os.environ.get('POSTSLOP_TEST_URL', 'http://127.0.0.1:8091')
 upstream = os.environ.get('POSTSLOP_SIMULATION_URL', 'http://127.0.0.1:4902')
-headers = {'Authorization': 'Bearer ' + (root/'storage/test-client-token').read_text().strip(), 'Content-Type': 'application/json'}
+headers = {'Authorization': 'Bearer ' + os.environ.get('POSTSLOP_TOKEN', 'test-token'), 'Content-Type': 'application/json'}
 
 def call(path, data=None):
     request = urllib.request.Request(base + path, data=None if data is None else json.dumps(data).encode(), headers=headers)

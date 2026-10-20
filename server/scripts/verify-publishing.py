@@ -11,7 +11,7 @@ import uuid
 root = Path(__file__).resolve().parents[1]
 app = os.environ.get('POSTSLOP_TEST_URL', 'http://127.0.0.1:8091').rstrip('/')
 simulation = os.environ.get('POSTSLOP_SIMULATION_URL', 'http://127.0.0.1:4900').rstrip('/')
-token = (root / 'storage/test-client-token').read_text().strip()
+token = os.environ.get('POSTSLOP_TOKEN', 'test-token')
 
 def request(url, data=None, authenticated=False):
     headers = {'Content-Type': 'application/json'}

@@ -12,21 +12,17 @@ PrivateFiles::directory($storage);
 PrivateFiles::directory($storage . '/media');
 PrivateFiles::directory($storage . '/browser');
 PrivateFiles::directory($storage . '/browser/x');
-$path = $storage . '/client-token';
-if (!is_file($path)) {
-    $previous = umask(0o077);
-    try {
-        $file = fopen($path, 'x');
-        if ($file === false) {
-            throw new RuntimeException('Could not create the access token.');
-        }
-        fwrite($file, bin2hex(random_bytes(32)) . "\n");
-        fclose($file);
-    } finally {
-        umask($previous);
-    }
+// The access token lives in .env, so only you may read that file.
+$env = dirname(__DIR__) . '/.env';
+$settings = is_file($env) ? (string) file_get_contents($env) : '';
+if (preg_match('/^POSTSLOP_TOKEN=\S/m', $settings) !== 1) {
+    $token = 'POSTSLOP_TOKEN=' . bin2hex(random_bytes(32));
+    $settings = preg_match('/^POSTSLOP_TOKEN=.*$/m', $settings) === 1
+        ? (string) preg_replace('/^POSTSLOP_TOKEN=.*$/m', $token, $settings)
+        : rtrim($settings) . ($settings === '' ? '' : "\n") . $token . "\n";
+    file_put_contents($env, $settings);
 }
-chmod($path, 0o600);
+chmod($env, 0o600);
 $app = require dirname(__DIR__) . '/app.php';
 $app->container->get(Migrator::class)->run();
 foreach (glob($storage . '/database.sqlite*') ?: [] as $database) {

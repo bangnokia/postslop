@@ -2,7 +2,7 @@
 
 The web client talks to the core through this API. The command line (`bin/postslop`) runs the same core directly; both follow the same rules.
 
-Base URL: `http://127.0.0.1:8087`. Every `/api/` request requires `Authorization: Bearer <contents of server/storage/client-token>`, from any host. The token is private and must not appear in examples, logs or shared files. `POST` and `PUT` bodies must be `Content-Type: application/json`. Responses are not cached.
+Base URL: `http://127.0.0.1:8087`. Every `/api/` request requires `Authorization: Bearer <POSTSLOP_TOKEN from server/.env>`, from any host. The token is private and must not appear in examples, logs or shared files. `POST` and `PUT` bodies must be `Content-Type: application/json`. Responses are not cached.
 
 ## Posts and their lifecycle
 

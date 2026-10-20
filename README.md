@@ -29,7 +29,7 @@ Requires PHP 8.4+ with `fileinfo` and `gd`, Composer, Node 22+ and Python 3. Com
 cd server
 composer install
 cp -n .env.example .env        # only on a new checkout
-php scripts/setup.php          # private storage, access token, database
+php scripts/setup.php          # private storage, access token in .env, database
 cd browser-worker && npm ci && npm run setup && cd ..   # X's private headless browser
 bin/postslop setup             # import your signed-in sessions from Chrome
 ```
@@ -96,7 +96,7 @@ Each post's ID is its request ID, with a fingerprint of its content. Before cont
 
 ## Private local data
 
-`server/storage/`, `.env`, dependencies, the built web client and compiled helpers stay out of Git. The database, images and sessions have private permissions, in folders only you can read. Postslop can run on another machine and be reached from anywhere it listens (`SERVER_ADDRESS`). The HTTP API requires the access token in `server/storage/client-token` as a bearer token and never serves private storage. The web client asks for that token once and keeps it in the browser; you may replace the file's contents with your own password. Put HTTPS in front of it when it is reached over a network, since the token travels with every request. Raycast uses the CLI and needs no token.
+`server/storage/`, `.env`, dependencies, the built web client and compiled helpers stay out of Git. The database, images and sessions have private permissions, in folders only you can read. Postslop can run on another machine and be reached from anywhere it listens (`SERVER_ADDRESS`). The HTTP API requires the access token, `POSTSLOP_TOKEN` in `server/.env`, as a bearer token and never serves private storage. The web client asks for that token once and keeps it in the browser; setup writes a random one, and you may set your own password there. Put HTTPS in front of it when it is reached over a network, since the token travels with every request. Raycast uses the CLI and needs no token.
 
 ## Checks
 

@@ -52,7 +52,7 @@ function App() {
   );
 }
 
-// Sign in with the access token from server/storage/client-token, checked against the API before it is kept.
+// Sign in with the access token, POSTSLOP_TOKEN in server/.env, checked against the API before it is kept.
 function SignIn() {
   const [token, setToken] = useState("");
   const [error, setError] = useState<string>();
@@ -84,7 +84,7 @@ function SignIn() {
           </button>
         </form>
         {error && <p className="sign-in-error">{error}</p>}
-        <p className="hint">It is in server/storage/client-token on the machine running Postslop.</p>
+        <p className="hint">It is POSTSLOP_TOKEN in server/.env on the machine running Postslop.</p>
       </main>
     </div>
   );

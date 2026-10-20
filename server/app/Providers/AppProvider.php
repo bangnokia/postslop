@@ -28,7 +28,7 @@ final class AppProvider implements Provider
     {
         $container->singleton(
             AccessToken::class,
-            static fn(): AccessToken => new AccessToken(config('postslop.token_path')),
+            static fn(): AccessToken => new AccessToken(config('postslop.token')),
         );
         $container->singleton(
             SessionStore::class,
