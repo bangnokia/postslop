@@ -108,6 +108,20 @@ final readonly class Publishing
     }
 
     /**
+     * The sites a post goes to when none are named: those with a saved session that are turned on. Nothing
+     * remote is checked, so it is quick.
+     *
+     * @return list<string>
+     */
+    public function defaultPlatforms(): array
+    {
+        return array_values(array_filter(Platforms::IDS, function (string $platform): bool {
+            $account = $this->sessions->summary($platform);
+            return $account['connected'] && $account['enabled'];
+        }));
+    }
+
+    /**
      * Turns an account on or off. A turned-off account keeps its session, is left out of the composer, and any post
      * still addressed to it fails for that site without sending anything.
      */

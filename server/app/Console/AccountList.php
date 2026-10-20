@@ -21,7 +21,7 @@ final readonly class AccountList extends CliCommand
             Show the accounts, or turn one on or off, or remove it
             Usage: postslop accounts [--refresh] [--json]
                    postslop accounts enable|disable|remove SITE [--json]
-            SITE is x, bluesky or dev-null. A turned-off account keeps its session but is not offered
+            SITE is x, bluesky, dev-null or linkedin. A turned-off account keeps its session but is not offered
             or published to. Removing one deletes its session; its posts stay in the history.
             Add or refresh an account with: postslop setup SITE
             Options:
@@ -34,7 +34,7 @@ final readonly class AccountList extends CliCommand
         $action = $input->argument(0);
         $site = $input->argument(1);
         if ($action !== null && $site === null) {
-            throw Failure::invalid('Name the site: postslop accounts ' . $action . ' x|bluesky|dev-null');
+            throw Failure::invalid('Name the site: postslop accounts ' . $action . ' x|bluesky|dev-null|linkedin');
         }
         $accounts = match ($action) {
             null => $input->flag('refresh') ? $this->publishing->refreshAccounts() : $this->publishing->accounts(),

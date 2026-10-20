@@ -9,6 +9,7 @@ use App\Core\Publishing;
 use App\Jobs\PublishDuePosts;
 use App\Social\BlueskyPublisher;
 use App\Social\DevNullPublisher;
+use App\Social\LinkedInPublisher;
 use App\Social\SessionStore;
 use App\Social\XBrowserPublisher;
 use App\Social\XPublisher;
@@ -54,6 +55,7 @@ final class AppProvider implements Provider
                     'x' => $x,
                     'bluesky' => new BlueskyPublisher($http, $sessions),
                     'dev-null' => new DevNullPublisher($http, $sessions),
+                    'linkedin' => new LinkedInPublisher($http, $sessions),
                 ],
                 $container->get(Database::class),
                 $container->get(Cache::class),

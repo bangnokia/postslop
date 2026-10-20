@@ -19,5 +19,6 @@ private_text(root / 'storage/test-sessions.json', json.dumps({'accounts': {
     'x': {'handle': 'tester', 'session': {'cookies': [cookie('auth_token', 'fixture-auth', '.x.com'), cookie('ct0', 'fixture-csrf', '.x.com')], 'origins': []}},
     'bluesky': {'handle': 'tester.test', 'session': {'cookies': [], 'origins': [{'origin': 'https://bsky.app', 'localStorage': [{'name': 'BSKY_STORAGE', 'value': json.dumps(bluesky)}]}]}},
     'dev-null': {'handle': 'tester', 'session': {'cookies': [cookie('dev_null_session', 'fixture-session', '127.0.0.1'), cookie('XSRF-TOKEN', 'fixture-xsrf', '127.0.0.1')], 'origins': []}},
+    'linkedin': {'handle': 'tester', 'session': {'cookies': [cookie('li_at', 'fixture-li-at', '.www.linkedin.com'), cookie('JSESSIONID', '"ajax:fixture"', '.www.linkedin.com')], 'origins': []}},
 }}))
 print('Prepared isolated fake sessions in storage/test-sessions.json.')

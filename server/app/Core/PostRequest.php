@@ -105,7 +105,12 @@ final readonly class PostRequest
         if (!is_string($text) || !mb_check_encoding($text, 'UTF-8') || mb_strlen($text) > 3000) {
             throw Failure::invalid('Post text must contain at most 3,000 characters.');
         }
-        if (!is_array($platforms) || !array_is_list($platforms) || $platforms === [] || count($platforms) > 3) {
+        if (
+            !is_array($platforms)
+            || !array_is_list($platforms)
+            || $platforms === []
+            || count($platforms) > count(Platforms::IDS)
+        ) {
             throw Failure::invalid('Select at least one destination.');
         }
         foreach ($platforms as $platform) {

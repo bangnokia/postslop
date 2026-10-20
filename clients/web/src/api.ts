@@ -1,8 +1,8 @@
 // The types of /api/v1, as docs/api.md describes them.
 
-export type Platform = "x" | "bluesky" | "dev-null";
-export const PLATFORMS: Platform[] = ["x", "bluesky", "dev-null"];
-export const PLATFORM_NAMES: Record<Platform, string> = { x: "X", bluesky: "Bluesky", "dev-null": "dev-null.sh" };
+export type Platform = "x" | "bluesky" | "dev-null" | "linkedin";
+export const PLATFORMS: Platform[] = ["x", "bluesky", "dev-null", "linkedin"];
+export const PLATFORM_NAMES: Record<Platform, string> = { x: "X", bluesky: "Bluesky", "dev-null": "dev-null.sh", linkedin: "LinkedIn" };
 
 export type PostStatus = "draft" | "scheduled" | "queued" | "publishing" | "published" | "partial" | "failed" | "unknown";
 
@@ -166,12 +166,12 @@ export const api = {
   },
 };
 
-// Share clean destination URLs only: https on the three sites, without tracking parameters.
+// Share clean destination URLs only: https on the publishing sites, without tracking parameters.
 export function cleanUrl(value?: string): string | undefined {
   if (!value) return;
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || !["x.com", "bsky.app", "dev-null.sh"].includes(url.hostname)) return;
+    if (url.protocol !== "https:" || !["x.com", "bsky.app", "dev-null.sh", "www.linkedin.com"].includes(url.hostname)) return;
     for (const key of [...url.searchParams.keys()]) if (key.startsWith("utm_")) url.searchParams.delete(key);
     return url.href;
   } catch {

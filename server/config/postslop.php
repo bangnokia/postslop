@@ -20,4 +20,5 @@ return [
     'x_upload_url' => env('POSTSLOP_X_UPLOAD_URL', 'https://upload.x.com'),
     'bluesky_url' => env('POSTSLOP_BLUESKY_URL', ''),
     'dev_null_url' => env('POSTSLOP_DEV_NULL_URL', 'https://dev-null.sh'),
+    'linkedin_url' => env('POSTSLOP_LINKEDIN_URL', 'https://www.linkedin.com'),
 ];

@@ -298,6 +298,10 @@ p {
   color: var(--bluesky);
 }
 
+.platform-linkedin {
+  color: var(--linkedin);
+}
+
 .platform-dev-null .ink {
   fill: var(--dev-null-ink);
 }

@@ -23,9 +23,9 @@ final readonly class PostCreate extends CliCommand
     {
         return <<<'TEXT'
             Write a post: saved as a draft unless --now or --at says otherwise
-            Usage: postslop post "Text" [--to=x,bluesky,dev-null] [--image=a.png,b.png] [--now | --at=TIME]
+            Usage: postslop post "Text" [--to=x,bluesky,dev-null,linkedin] [--image=a.png,b.png] [--now | --at=TIME]
             Options:
-              --to=LIST          Destinations, comma separated (default: all three)
+              --to=LIST          Destinations, comma separated (default: every account set up and turned on)
               --image=LIST       JPEG, PNG or WebP files of at most 1 MiB, comma separated
               --now              Publish immediately
               --at=TIME          Schedule: "2026-10-21 09:00", "tomorrow 9am" or "+2 hours", local time
@@ -51,7 +51,7 @@ final readonly class PostCreate extends CliCommand
     private function data(Input $input): array
     {
         $source = self::value($input, 'input');
-        $data = $source === null ? self::fromFlags($input) : self::fromJson($source);
+        $data = $source === null ? $this->fromFlags($input) : self::fromJson($source);
         $requestId = self::value($input, 'request-id');
         if ($requestId !== null) {
             $data['requestId'] = $requestId;
@@ -84,7 +84,7 @@ final readonly class PostCreate extends CliCommand
         return $data;
     }
 
-    private static function fromFlags(Input $input): array
+    private function fromFlags(Input $input): array
     {
         $text = implode(' ', $input->arguments());
         $to = self::value($input, 'to');
@@ -92,7 +92,7 @@ final readonly class PostCreate extends CliCommand
         return [
             'text' => $text === '-' ? rtrim((string) stream_get_contents(STDIN), "\n") : $text,
             'platforms' => $to === null
-                ? Platforms::IDS
+                ? $this->publishing->defaultPlatforms()
                 : array_values(array_filter(array_map('trim', explode(',', $to)))),
             'images' => $images === null
                 ? []

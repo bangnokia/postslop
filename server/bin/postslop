@@ -26,7 +26,7 @@ $arguments = array_slice($argv, 1);
 $name = $arguments[0] ?? null;
 if ($name === null || in_array($name, ['help', '--help', '-h'], true) && !isset($arguments[1])) {
     echo <<<'TEXT'
-        Postslop: write once, publish to X, Bluesky and dev-null.sh.
+        Postslop: write once, publish to X, Bluesky, dev-null.sh and LinkedIn.
 
           postslop setup [SITE]          Import your signed-in sessions from Chrome (or --browser=firefox);
                                          add --to=URL to send them to Postslop on another machine

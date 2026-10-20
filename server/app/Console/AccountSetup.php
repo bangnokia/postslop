@@ -17,7 +17,12 @@ use Psr\Http\Client\ClientExceptionInterface;
 // @mago-expect lint:cyclomatic-complexity,kan-defect,halstead
 final readonly class AccountSetup extends CliCommand
 {
-    private const array SITES = ['x' => 'X', 'bluesky' => 'Bluesky', 'dev-null' => 'dev-null.sh'];
+    private const array SITES = [
+        'x' => 'X',
+        'bluesky' => 'Bluesky',
+        'dev-null' => 'dev-null.sh',
+        'linkedin' => 'LinkedIn',
+    ];
 
     public function __construct(
         private Publishing $publishing,
@@ -28,17 +33,19 @@ final readonly class AccountSetup extends CliCommand
     public function description(): string
     {
         return <<<'TEXT'
-            Import your signed-in X, Bluesky and dev-null.sh sessions from Chrome or Firefox
-            Usage: postslop setup [x] [bluesky] [dev-null] [--browser=chrome|firefox] [--x=HANDLE] [--bluesky=HANDLE]
-                                  [--dev-null=HANDLE] [--profile=DIR] [--to=URL --token=TOKEN]
-            Name sites to import only those; with none, all three are imported. First check in the
+            Import your signed-in X, Bluesky, dev-null.sh and LinkedIn sessions from Chrome or Firefox
+            Usage: postslop setup [x] [bluesky] [dev-null] [linkedin] [--browser=chrome|firefox] [--x=HANDLE]
+                                  [--bluesky=HANDLE] [--dev-null=HANDLE] [--linkedin=HANDLE] [--profile=DIR] [--to=URL --token=TOKEN]
+            Name sites to import only those; with none, each site's handle is asked for, and an empty
+            answer skips that site. First check in the
             browser which account is signed in on each site. Postslop refuses a session that belongs
             to another account than the handle you give.
             Options:
               --browser=NAME chrome (default) or firefox. Chrome asks macOS once for
                              "Chrome Safe Storage" to decrypt its cookies: choose Allow
-              --x=HANDLE, --bluesky=HANDLE, --dev-null=HANDLE
-                             The account signed in on each site; asked for when left out
+              --x=HANDLE, --bluesky=HANDLE, --dev-null=HANDLE, --linkedin=HANDLE
+                             The account signed in on each site; asked for when left out. LinkedIn's
+                             handle is the name in your profile address, linkedin.com/in/NAME
               --profile=DIR  The profile folder (default: the browser's last used or default profile)
               --check-only   Read the sessions without saving them
               --to=URL       Send the sessions to Postslop on another machine instead of saving them here,
@@ -65,7 +72,7 @@ final readonly class AccountSetup extends CliCommand
         $sites = $input->arguments() === [] ? array_keys(self::SITES) : array_values(array_unique($input->arguments()));
         foreach ($sites as $site) {
             if (!array_key_exists($site, self::SITES)) {
-                throw Failure::invalid('There is no ' . $site . ' site. Name x, bluesky or dev-null.');
+                throw Failure::invalid('There is no ' . $site . ' site. Name x, bluesky, dev-null or linkedin.');
             }
         }
         $remote = self::remote($input);
@@ -73,10 +80,17 @@ final readonly class AccountSetup extends CliCommand
         foreach (array_intersect_key(self::SITES, array_flip($sites)) as $site => $label) {
             $handle = self::value($input, $site) ?? self::ask('Signed-in ' . $label . ' handle: @');
             $handle = ltrim(trim($handle), '@');
+            // Asked about every site, an empty answer leaves that one out.
+            if ($handle === '' && $input->arguments() === [] && self::value($input, $site) === null) {
+                continue;
+            }
             if (preg_match('/^[A-Za-z0-9._-]+$/D', $handle) !== 1) {
                 throw Failure::invalid('Give the ' . $label . ' handle, such as --' . $site . '=yourname.');
             }
             $handles[$site] = $handle;
+        }
+        if ($handles === []) {
+            throw Failure::invalid('Give the handle of at least one site.');
         }
         $command = [
             'python3',
@@ -224,7 +238,9 @@ final readonly class AccountSetup extends CliCommand
     private static function ask(string $question): string
     {
         if (!stream_isatty(STDIN)) {
-            throw Failure::invalid('Give every handle: postslop setup --x=… --bluesky=… --dev-null=…');
+            throw Failure::invalid(
+                'Name the sites and their handles, such as: postslop setup linkedin --linkedin=NAME',
+            );
         }
         fwrite(STDOUT, $question);
         return (string) fgets(STDIN);

@@ -10,6 +10,9 @@ export interface ServerStatus {
     id: Platform;
     label: string;
     available: boolean;
+    // Set up and turned on in Postslop; older servers leave these out.
+    connected?: boolean;
+    enabled?: boolean;
     handle?: string;
     reason?: string;
     maxImages?: number;

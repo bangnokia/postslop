@@ -29,7 +29,12 @@ assert.deepEqual(
   Object.fromEntries(
     status.platforms.map((item) => [item.id, item.handle.replace(/^@/, "")]),
   ),
-  { x: "tester", bluesky: "tester.test", "dev-null": "tester" },
+  {
+    x: "tester",
+    bluesky: "tester.test",
+    "dev-null": "tester",
+    linkedin: "tester",
+  },
   "Refusing to send fixture posts to real accounts",
 );
 
@@ -56,7 +61,7 @@ assert.equal(statSync(image.path).mode & 0o777, 0o600);
 async function counts() {
   return Object.fromEntries(
     await Promise.all(
-      ["x", "bluesky", "dev-null"].map(async (id) => {
+      ["x", "bluesky", "dev-null", "linkedin"].map(async (id) => {
         const response = await fetch(`${simulation}/${id}/__stats`);
         assert(response.ok);
         return [id, (await response.json()).posts.length];

@@ -18,7 +18,12 @@ assert.deepEqual(
   Object.fromEntries(
     status.platforms.map((x) => [x.id, x.handle.replace(/^@/, "")]),
   ),
-  { x: "tester", bluesky: "tester.test", "dev-null": "tester" },
+  {
+    x: "tester",
+    bluesky: "tester.test",
+    "dev-null": "tester",
+    linkedin: "tester",
+  },
 );
 const store = new DraftStore(
   mkdtempSync(join(tmpdir(), "postslop-background-")),

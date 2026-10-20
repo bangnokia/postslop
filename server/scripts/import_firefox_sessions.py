@@ -19,7 +19,7 @@ import tempfile
 import time
 
 
-DOMAINS = {"x": "x.com", "bluesky": "bsky.app", "dev-null": "dev-null.sh"}
+DOMAINS = {"x": "x.com", "bluesky": "bsky.app", "dev-null": "dev-null.sh", "linkedin": "linkedin.com"}
 MAX_DATABASE_BYTES = 128 * 1024 * 1024
 MAX_LOCAL_STORAGE_BYTES = 8 * 1024 * 1024
 
@@ -256,9 +256,13 @@ def main() -> int:
     parser.add_argument("--x-handle", help="X handle already verified in Firefox; leave out to skip this site")
     parser.add_argument("--bluesky-handle", help="Bluesky handle already verified in Firefox; leave out to skip this site")
     parser.add_argument("--dev-null-handle", help="dev-null.sh handle already verified in Firefox; leave out to skip this site")
+    parser.add_argument("--linkedin-handle", help="LinkedIn public profile name already verified in Firefox; leave out to skip this site")
     arguments = parser.parse_args()
     # Only the sites given a handle are imported, so one account can be added or refreshed on its own.
-    given = {"x": arguments.x_handle, "bluesky": arguments.bluesky_handle, "dev-null": arguments.dev_null_handle}
+    given = {
+        "x": arguments.x_handle, "bluesky": arguments.bluesky_handle, "dev-null": arguments.dev_null_handle,
+        "linkedin": arguments.linkedin_handle,
+    }
     handles = {platform: handle.lstrip("@") for platform, handle in given.items() if handle is not None}
     if not handles:
         parser.error("Give the handle of at least one site.")
@@ -281,6 +285,8 @@ def main() -> int:
         raise ImportFailure("The selected Firefox profile has no usable persisted X sign-in.")
     if "dev-null" in handles and not any(cookie["name"] == "devnull-session" or cookie["name"].startswith("remember_web_") for cookie in states["dev-null"]["cookies"]):
         raise ImportFailure("The selected Firefox profile has no usable persisted dev-null.sh sign-in.")
+    if "linkedin" in handles and not {"li_at", "JSESSIONID"}.issubset({cookie["name"] for cookie in states["linkedin"]["cookies"]}):
+        raise ImportFailure("The selected Firefox profile has no usable persisted LinkedIn sign-in.")
     if "bluesky" in handles:
         local_storage = read_bluesky_storage(arguments.profile, handles["bluesky"])
         states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]

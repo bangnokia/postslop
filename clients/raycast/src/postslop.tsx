@@ -192,6 +192,21 @@ export default function Postslop() {
     }
   }
 
+  // Only accounts that are set up and turned on are offered.
+  const offered = platforms.filter((id) => {
+    const account = server?.platforms.find((item) => item.id === id);
+    return (
+      !account || (account.connected !== false && account.enabled !== false)
+    );
+  });
+  useEffect(() => {
+    const value = current.current;
+    if (!server || !value || value.submitted) return;
+    const kept = value.platforms.filter((id) => offered.includes(id));
+    if (kept.length !== value.platforms.length)
+      commit({ ...value, platforms: kept });
+  }, [server, draft?.requestId]);
+
   function imageLimit(value: Draft) {
     return Math.min(
       4,
@@ -541,7 +556,7 @@ export default function Postslop() {
           value={draft.platforms}
           onChange={(value) => edit({ platforms: value as Platform[] })}
         >
-          {platforms.map((id) => (
+          {offered.map((id) => (
             <Form.TagPicker.Item
               key={id}
               value={id}

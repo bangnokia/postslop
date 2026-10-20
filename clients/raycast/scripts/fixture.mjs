@@ -21,6 +21,7 @@ export const fixtureEnv = {
   POSTSLOP_X_BUNDLE_URL: `${fakes}/x/main.js`,
   POSTSLOP_BLUESKY_URL: `${fakes}/bluesky`,
   POSTSLOP_DEV_NULL_URL: `${fakes}/dev-null`,
+  POSTSLOP_LINKEDIN_URL: `${fakes}/linkedin`,
 };
 export const fakeSites = fakes;
 export const fixtureClient = () => new PostslopClient(server, fixtureEnv);

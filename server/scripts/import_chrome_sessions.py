@@ -82,7 +82,11 @@ def read_cookies(connection: sqlite3.Connection, key: bytes, domain: str) -> tup
     columns = {row[1] for row in connection.execute("PRAGMA table_info(cookies)")}
     if version is None or str(version[0]) != "24" or not required.issubset(columns):
         raise ImportFailure("Unsupported Chrome cookie schema; only version 24 is supported.")
-    rows = connection.execute("SELECT * FROM cookies WHERE host_key IN (?, ?)", (domain, "." + domain))
+    # LinkedIn keeps its sign-in cookies on .www.linkedin.com, below the site's own domain.
+    if domain == "linkedin.com":
+        rows = connection.execute("SELECT * FROM cookies WHERE host_key IN (?, ?) OR host_key LIKE ?", (domain, "." + domain, "%." + domain))
+    else:
+        rows = connection.execute("SELECT * FROM cookies WHERE host_key IN (?, ?)", (domain, "." + domain))
     cookies = []
     skipped = {"partitioned": 0, "multiAccount": 0, "expired": 0}
     now = time.time()
@@ -286,9 +290,13 @@ def main() -> int:
     parser.add_argument("--x-handle", help="X handle already verified in Chrome; leave out to skip this site")
     parser.add_argument("--bluesky-handle", help="Bluesky handle already verified in Chrome; leave out to skip this site")
     parser.add_argument("--dev-null-handle", help="dev-null.sh handle already verified in Chrome; leave out to skip this site")
+    parser.add_argument("--linkedin-handle", help="LinkedIn public profile name already verified in Chrome; leave out to skip this site")
     arguments = parser.parse_args()
     # Only the sites given a handle are imported, so one account can be added or refreshed on its own.
-    given = {"x": arguments.x_handle, "bluesky": arguments.bluesky_handle, "dev-null": arguments.dev_null_handle}
+    given = {
+        "x": arguments.x_handle, "bluesky": arguments.bluesky_handle, "dev-null": arguments.dev_null_handle,
+        "linkedin": arguments.linkedin_handle,
+    }
     handles = {platform: handle.lstrip("@") for platform, handle in given.items() if handle is not None}
     if not handles:
         parser.error("Give the handle of at least one site.")
@@ -319,6 +327,8 @@ def main() -> int:
         require_x_sign_in(states["x"]["cookies"])
     if "dev-null" in handles and not any(cookie["name"] == "devnull-session" or cookie["name"].startswith("remember_web_") for cookie in states["dev-null"]["cookies"]):
         raise ImportFailure("The selected Chrome profile has no usable persisted dev-null.sh sign-in.")
+    if "linkedin" in handles and not {"li_at", "JSESSIONID"}.issubset({cookie["name"] for cookie in states["linkedin"]["cookies"]}):
+        raise ImportFailure("The selected Chrome profile has no usable persisted LinkedIn sign-in.")
     if "bluesky" in handles:
         states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]
         accounts["bluesky"]["localStorageCount"] = len(local_storage)
