@@ -241,6 +241,24 @@ def bluesky_storage(value: str, expected_handle: str) -> list[dict]:
     return [{"name": "BSKY_STORAGE", "value": json.dumps(state, ensure_ascii=True, separators=(",", ":"))}]
 
 
+def firefox_user_agent(profile: Path) -> str | None:
+    """The User-Agent this profile's Firefox sends, from the version it last ran; LinkedIn refuses a session
+    presented with another browser's."""
+    try:
+        for line in (profile / "compatibility.ini").read_text().splitlines():
+            if line.startswith("LastVersion="):
+                major = line.split("=", 1)[1].split(".", 1)[0]
+                break
+        else:
+            return None
+    except OSError:
+        return None
+    if not major.isdigit():
+        return None
+    system = {"darwin": "Macintosh; Intel Mac OS X 10.15", "win32": "Windows NT 10.0; Win64; x64"}.get(sys.platform, "X11; Linux x86_64")
+    return f"Mozilla/5.0 ({system}; rv:{major}.0) Gecko/20100101 Firefox/{major}.0"
+
+
 def report(source: str, profile: Path, states: dict, accounts: dict) -> None:
     """Hand the sessions to `postslop setup` through a pipe; never show them on a terminal."""
     if sys.stdout.isatty():
@@ -287,6 +305,8 @@ def main() -> int:
         raise ImportFailure("The selected Firefox profile has no usable persisted dev-null.sh sign-in.")
     if "linkedin" in handles and not {"li_at", "JSESSIONID"}.issubset({cookie["name"] for cookie in states["linkedin"]["cookies"]}):
         raise ImportFailure("The selected Firefox profile has no usable persisted LinkedIn sign-in.")
+    if "linkedin" in handles and (user_agent := firefox_user_agent(arguments.profile)):
+        states["linkedin"]["userAgent"] = user_agent
     if "bluesky" in handles:
         local_storage = read_bluesky_storage(arguments.profile, handles["bluesky"])
         states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]

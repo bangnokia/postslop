@@ -284,6 +284,18 @@ def default_profile() -> Path:
     return base / name
 
 
+def chrome_user_agent(profile: Path) -> str | None:
+    """The User-Agent this Chrome sends, from the version it last ran; LinkedIn refuses a session presented
+    with another browser's."""
+    try:
+        major = (profile.parent / "Last Version").read_text().strip().split(".", 1)[0]
+    except OSError:
+        return None
+    if not major.isdigit():
+        return None
+    return f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, help="Chrome profile directory (default: the last used profile)")
@@ -329,6 +341,8 @@ def main() -> int:
         raise ImportFailure("The selected Chrome profile has no usable persisted dev-null.sh sign-in.")
     if "linkedin" in handles and not {"li_at", "JSESSIONID"}.issubset({cookie["name"] for cookie in states["linkedin"]["cookies"]}):
         raise ImportFailure("The selected Chrome profile has no usable persisted LinkedIn sign-in.")
+    if "linkedin" in handles and (user_agent := chrome_user_agent(profile)):
+        states["linkedin"]["userAgent"] = user_agent
     if "bluesky" in handles:
         states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]
         accounts["bluesky"]["localStorageCount"] = len(local_storage)

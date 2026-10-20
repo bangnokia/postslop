@@ -16,6 +16,7 @@ use Psr\Http\Client\ClientExceptionInterface;
 // @mago-expect lint:too-many-methods,cyclomatic-complexity,kan-defect
 final readonly class LinkedInPublisher implements Publisher
 {
+    // Used only when the import did not record the browser's own User-Agent.
     private const string USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
     public function __construct(
@@ -113,7 +114,7 @@ final readonly class LinkedInPublisher implements Publisher
     /**
      * Registers an image with LinkedIn's media service and uploads its bytes; the post then refers to it by URN.
      *
-     * @param array{url: string, client: Client, cookie: string, csrf: string, handle: string} $session
+     * @param array{url: string, client: Client, cookie: string, csrf: string, agent: string, handle: string} $session
      */
     private function upload(array $session, ImageAttachment $image): string
     {
@@ -142,7 +143,7 @@ final readonly class LinkedInPublisher implements Publisher
                 'Content-Type' => $image->mimeType,
                 'Cookie' => $session['cookie'],
                 'csrf-token' => $session['csrf'],
-                'User-Agent' => self::USER_AGENT,
+                'User-Agent' => $session['agent'],
             ],
             body: $image->bytes,
         );
@@ -152,7 +153,7 @@ final readonly class LinkedInPublisher implements Publisher
         return $urn;
     }
 
-    /** @return array{url: string, client: Client, cookie: string, csrf: string, handle: string} */
+    /** @return array{url: string, client: Client, cookie: string, csrf: string, agent: string, handle: string} */
     private function connect(): array
     {
         $state = $this->sessions->read('linkedin');
@@ -175,6 +176,8 @@ final readonly class LinkedInPublisher implements Publisher
                 $cookies,
             )),
             'csrf' => trim($cookies['JSESSIONID'], '"'),
+            // LinkedIn refuses a session presented by another browser than the one it was signed in with.
+            'agent' => is_string($state['userAgent'] ?? null) ? $state['userAgent'] : self::USER_AGENT,
             'handle' => '',
         ];
         $response = $session['client']->get($session['url'] . '/voyager/api/me', headers: $this->headers($session));
@@ -215,7 +218,7 @@ final readonly class LinkedInPublisher implements Publisher
         return null;
     }
 
-    /** @param array{url: string, cookie: string, csrf: string} $session */
+    /** @param array{url: string, cookie: string, csrf: string, agent: string} $session */
     private function headers(array $session): array
     {
         return [
@@ -224,7 +227,7 @@ final readonly class LinkedInPublisher implements Publisher
             'csrf-token' => $session['csrf'],
             'x-restli-protocol-version' => '2.0.0',
             'x-li-lang' => 'en_US',
-            'User-Agent' => self::USER_AGENT,
+            'User-Agent' => $session['agent'],
             'Origin' => $session['url'],
             'Referer' => $session['url'] . '/feed/',
         ];

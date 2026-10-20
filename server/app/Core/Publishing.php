@@ -166,15 +166,25 @@ final readonly class Publishing
                 'The session must hold the browser’s cookies and origins, as postslop setup reads them.',
             );
         }
-        $this->sessions->import([
-            $platform => [
-                'handle' => $handle,
-                'session' => [
-                    'cookies' => $session['cookies'],
-                    'origins' => $session['origins'] ?? [],
+        $userAgent = $session['userAgent'] ?? null;
+        $this->sessions->import(
+            [
+                $platform => [
+                    'handle' => $handle,
+                    'session' => [
+                        'cookies' => $session['cookies'],
+                        'origins' => $session['origins'] ?? [],
+                        // The browser's own User-Agent, for a site that checks a session comes from the same browser.
+                        ...(
+                            is_string($userAgent) && preg_match('/^[\x20-\x7E]{1,300}$/D', $userAgent) === 1
+                                ? ['userAgent' => $userAgent]
+                                : []
+                        ),
+                    ],
                 ],
             ],
-        ], $source);
+            $source,
+        );
         return $this->refreshAccounts();
     }
 
