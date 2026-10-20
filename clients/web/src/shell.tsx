@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, inFlight, PLATFORM_NAMES, PLATFORMS, signOut, storedToken, type Post, type PostStatus } from "./api";
+import { api, inFlight, outcome, PLATFORM_NAMES, PLATFORMS, signOut, storedToken, type Post, type PostStatus } from "./api";
 import { Icon, type IconName } from "./components/icons";
 import { FILTERS } from "./pages/Posts";
 import { PlatformIcon, postsChanged, usePolling, usePostsChanged, usable, useTheme, type AccountState, type Theme } from "./ui";
@@ -58,8 +58,7 @@ export function useShellState() {
             return;
           }
           // Failed or uncertain: the post and its images stay in Postslop, where it can be retried or checked.
-          const problems = fresh.results.filter((result) => result.status !== "published").map((result) => `${PLATFORM_NAMES[result.platform]}: ${result.error ?? result.status}`);
-          toast({ tone: "error", text: `${fresh.status === "unknown" ? "The outcome is unknown." : "Not everything was published."} ${problems.join(" ")}`, link });
+          toast({ tone: "error", text: outcome(fresh), link });
         })
         .catch(() => {});
     }

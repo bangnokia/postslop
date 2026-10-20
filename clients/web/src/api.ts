@@ -9,6 +9,16 @@ export type PostStatus = "draft" | "scheduled" | "queued" | "publishing" | "publ
 // Handed to the server's queue and not settled yet: worth checking again shortly.
 export const inFlight = (post: Post) => post.status === "queued" || post.status === "publishing";
 
+// What happened on each site, naming the ones that need attention and why: "Published to X, Bluesky. LinkedIn
+// failed: LinkedIn could not be reached. No post was submitted."
+export function outcome(post: Post): string {
+  const published = post.results.filter((result) => result.status === "published").map((result) => PLATFORM_NAMES[result.platform]);
+  const problems = post.results
+    .filter((result) => result.status === "failed" || result.status === "unknown")
+    .map((result) => `${PLATFORM_NAMES[result.platform]} ${result.status === "failed" ? "failed" : "is unknown, check it before posting again"}: ${result.error ?? "no reason given."}`);
+  return [published.length ? `Published to ${published.join(", ")}.` : "", ...problems].filter(Boolean).join(" ");
+}
+
 // Where a post sits on the calendar: when it went out, else when it is due, else when it was last tried.
 export const postTime = (post: Post) => post.publishedAt ?? post.scheduledAt ?? post.updatedAt;
 

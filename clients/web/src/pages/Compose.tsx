@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, inFlight, PLATFORM_NAMES, PLATFORMS, type NewImage, type Platform, type Post, type PostInput } from "../api";
+import { api, ApiError, inFlight, outcome, PLATFORM_NAMES, PLATFORMS, type NewImage, type Platform, type Post, type PostInput } from "../api";
 import { Icon } from "../components/icons";
 import { blankDraft, length, loadDraft, prepareImage, saveDraft, toIso, toLocalInput, uuid, when, type LocalDraft } from "../compose";
 import { PageHeader, useShell } from "../shell";
@@ -186,7 +186,7 @@ export function Composer({ editing, at, accounts, onDone }: { editing?: string; 
     } else {
       // Failed or uncertain: keep everything so nothing is lost.
       setSent(post);
-      setNotice({ text: post.status === "unknown" ? "The outcome is unknown. Check the account before sending again." : "Some destinations need attention. Your draft is kept.", error: true });
+      setNotice({ text: `${outcome(post)} Your draft is kept.`, error: true });
       return;
     }
     reset();

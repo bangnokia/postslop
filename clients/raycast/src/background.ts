@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { Postslop } from "./client";
-import { DraftStore, fullyPublished, validateResult } from "./draft.ts";
+import {
+  DraftStore,
+  fullyPublished,
+  platformNames,
+  validateResult,
+} from "./draft.ts";
 import type { Draft } from "./draft";
 
 export function taskIsActive(draft: Draft) {
@@ -83,7 +88,14 @@ export async function runTask(
       title: published
         ? `Postslop: published to ${published} destination${published === 1 ? "" : "s"}`
         : "Postslop: post saved",
-      message: "Some destinations need attention. Open Saved Posts.",
+      // Name each site that failed and why, as the HUD is all the user sees.
+      message: `${result.results
+        .filter((item) => item.status !== "published")
+        .map(
+          (item) =>
+            `${platformNames[item.platform]} ${item.status === "failed" ? "failed" : "unknown"}: ${item.error ?? "no reason given."}`,
+        )
+        .join(" ")} Open Saved Posts.`,
     };
   } catch (error) {
     const reason =
