@@ -2,14 +2,16 @@
 
 The web client talks to the core through this API. The command line (`bin/postslop`) runs the same core directly; both follow the same rules.
 
-Base URL: `http://127.0.0.1:8087`. Every `/api/` request requires `Authorization: Bearer <POSTSLOP_TOKEN from server/.env>`, from any host. The token is private and must not appear in examples, logs or shared files. `POST` and `PUT` bodies must be `Content-Type: application/json`. Responses are not cached.
+Base URL: `http://127.0.0.1:8087`. When `POSTSLOP_TOKEN` is set in `server/.env`, every `/api/` request requires `Authorization: Bearer <POSTSLOP_TOKEN>`, from any host; when it is empty, the API is open to anyone who can reach it. The token is private and must not appear in examples, logs or shared files. `POST` and `PUT` bodies must be `Content-Type: application/json`. Responses are not cached.
 
 ## Posts and their lifecycle
 
 ```
-draft ──▶ scheduled ──▶ publishing ──▶ published | partial | failed | unknown
-  └──────────────────────▲   (publish now)
+draft ──▶ scheduled ──▶ queued ──▶ publishing ──▶ published | partial | failed | unknown
+  └─────────────────────────▲   (publish now)
 ```
+
+Publishing never makes a request wait on the sites. `mode: "now"` and `POST …/publish` answer at once with the post `queued`, and the queue worker run by `postslop serve` sends it. Poll `GET /api/v1/posts/{id}` until the status is no longer `queued` or `publishing`. A queued post can no longer be edited or deleted. Any queued post the worker could not take, for example because another publication held the lock, goes out with the next scheduled minute.
 
 A post is one piece of content for one or more destinations. Each destination has its own result: `published`, `failed` or `unknown`. The post's status adds them up: `published` when every destination published, `partial` when some did, `unknown` when any outcome is unknown, otherwise `failed`.
 
@@ -83,6 +85,7 @@ Returns the post. A publication that partly or wholly failed is still a 200: rea
 ## Read posts
 
 - `GET /api/v1/posts?status=failed,unknown&limit=20&before=…` lists posts newest first: `{"posts": [...], "next": "…"}`. Pass `next` as `before` for the following page; it is `null` on the last.
+- `GET /api/v1/posts?from=…&to=…` lists the posts on a calendar between two times, soonest first: `{"posts": [...]}`. A post sits at its published time, else its scheduled time, else when it was last tried; drafts are left out. At most 62 days at a time.
 - `GET /api/v1/posts/{id}` returns one post.
 - `GET /api/v1/media/{id}` returns an attached image's bytes.
 
@@ -92,7 +95,7 @@ These work on drafts and scheduled posts only; a sent post's history cannot chan
 
 - `PUT /api/v1/posts/{id}` replaces the content, in the same shape as creating it. `mode` decides what happens next.
 - `POST /api/v1/posts/{id}/schedule` with `{"scheduledAt": "…"}` schedules or moves it, and with `null` returns it to the drafts.
-- `POST /api/v1/posts/{id}/publish` publishes it now. On a post already sent, it returns the post unchanged.
+- `POST /api/v1/posts/{id}/publish` queues it to publish now and returns it as `queued`. On a post already queued or sent, it returns the post unchanged.
 - `DELETE /api/v1/posts/{id}` deletes it (204).
 
 ## Retry — `POST /api/v1/posts/{id}/retry`
@@ -105,7 +108,7 @@ Sends again to the destinations that `failed`, with the stored text and images, 
 
 | Status | Code | Meaning |
 | --- | --- | --- |
-| 401 | | Missing or invalid access token |
+| 401 | | Missing or invalid access token, when one is set |
 | 404 | `not_found` | Unknown post, image or route |
 | 409 | `busy` | Another post is publishing; try again shortly |
 | 409 | `conflict` | The request ID belongs to other content, or the post was already sent |

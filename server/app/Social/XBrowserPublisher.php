@@ -45,7 +45,12 @@ final readonly class XBrowserPublisher implements Publisher
                 return [
                     ...$status,
                     'reason' => $this->reason('account_mismatch'),
-                    'detail' => 'Signed in as @' . ltrim((string) $handle, '@') . ', expected @' . $input['expectedHandle'] . '.',
+                    'detail' =>
+                        'Signed in as @'
+                            . ltrim((string) $handle, '@')
+                            . ', expected @'
+                            . $input['expectedHandle']
+                            . '.',
                 ];
             }
             return [...$status, 'available' => true, 'handle' => '@' . $input['expectedHandle']];

@@ -6,6 +6,7 @@ require __DIR__ . '/support.php';
 
 use App\Core\Publishing;
 use App\Social\Publisher;
+use Crab\Queue\Consumer;
 use Crab\Testing\Api;
 
 // An assertion evaluates a boolean condition rather than selecting a behavior.
@@ -73,7 +74,13 @@ try {
     $later = new DateTimeImmutable('+1 day')->format(DATE_ATOM);
     $api->post('/api/v1/posts/' . $id . '/schedule', ['scheduledAt' => $later])->assertStatus(200)->assertJson('status', 'scheduled');
     $api->get('/api/v1/posts', ['status' => 'scheduled'])->assertStatus(200)->assertJson('posts.0.id', $id);
-    $api->post('/api/v1/posts/' . $id . '/publish', [])->assertStatus(200)->assertJson('status', 'published');
+    // Publishing answers at once as queued; the queue worker sends it.
+    $api->post('/api/v1/posts/' . $id . '/publish', [])->assertStatus(200)->assertJson('status', 'queued');
+    $api->post('/api/v1/posts/' . $id . '/publish', [])->assertStatus(200)->assertJson('status', 'queued');
+    api_check($publisher->calls === 0, 'Queuing a post sent it before the queue ran');
+    $consumer = $app->container->get(Consumer::class);
+    api_check($consumer->runNext() && !$consumer->runNext(), 'Publishing twice did not queue exactly one job');
+    $api->get('/api/v1/posts/' . $id)->assertStatus(200)->assertJson('status', 'published');
     api_check($publisher->calls === 1, 'Publishing a scheduled post did not send it once');
     $api->put('/api/v1/posts/' . $id, ['text' => 'too late', 'platforms' => ['bluesky']])
         ->assertStatus(409)
@@ -91,8 +98,23 @@ try {
     $api->get('/api/v1/posts/' . $removable['id'])->assertStatus(404);
 
     $now = $api->post('/api/v1/posts', ['text' => 'now', 'platforms' => ['bluesky']])->assertStatus(200)->json();
-    api_check($now['status'] === 'published' && $publisher->calls === 2, 'Publishing now did not send');
-    echo "API checks passed: token checks, drafts, images, edits, scheduling, publishing, history, deletion, and error codes.\n";
+    api_check($now['status'] === 'queued' && $publisher->calls === 1, 'Publishing now did not answer as queued');
+    $consumer->runNext();
+    $api->get('/api/v1/posts/' . $now['id'])->assertJson('status', 'published');
+    api_check($publisher->calls === 2, 'The queue did not publish the post');
+    // The calendar range lists posts by when they went out or will, and leaves drafts out.
+    $api->post('/api/v1/posts', ['text' => 'a draft', 'platforms' => ['bluesky'], 'mode' => 'draft'])->assertStatus(200);
+    $range = $api->get('/api/v1/posts', [
+        'from' => new DateTimeImmutable('-1 day')->format(DATE_ATOM),
+        'to' => new DateTimeImmutable('+1 day')->format(DATE_ATOM),
+    ])->assertStatus(200)->json();
+    api_check(array_column($range['posts'], 'id') === [$id, $now['id']], 'The calendar range listed the wrong posts');
+    $api->get('/api/v1/posts', ['from' => '2026-01-01T00:00:00Z'])->assertStatus(422);
+
+    // Without a token the API is open.
+    putenv('POSTSLOP_TOKEN=');
+    new Api(test_app($directory . '/open'))->get('/api/v1/posts')->assertStatus(200);
+    echo "API checks passed: token checks, an open API without a token, drafts, images, edits, scheduling, publishing, history, deletion, and error codes.\n";
 } finally {
     test_remove($directory);
 }

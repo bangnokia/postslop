@@ -10,6 +10,7 @@ use Crab\App;
 use Crab\Contracts\Cache\Cache;
 use Crab\Contracts\Database\Database;
 use Crab\Contracts\Database\Migrator;
+use Crab\Contracts\Queue\Queue;
 
 /**
  * Boots the application on a throwaway database and private folders, never the real storage.
@@ -33,6 +34,7 @@ function test_publishing(App $app, array $publishers, string $directory): Publis
         $publishers,
         $app->container->get(Database::class),
         $app->container->get(Cache::class),
+        $app->container->get(Queue::class),
         $directory . '/publishing.lock',
         $directory . '/media',
     );

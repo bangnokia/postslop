@@ -31,6 +31,22 @@ final readonly class PostRequest
     ) {}
 
     /**
+     * The same post with another mode; the fingerprint does not include the mode, so it still matches.
+     */
+    public function as(string $mode): self
+    {
+        return new self(
+            $this->requestId,
+            $this->text,
+            $this->platforms,
+            $this->images,
+            $this->fingerprint,
+            $mode,
+            $this->scheduledAt,
+        );
+    }
+
+    /**
      * Images arrive as base64 data. A remote caller never names a file on this machine.
      */
     public static function fromApi(array $data): self

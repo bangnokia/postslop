@@ -17,7 +17,16 @@ use Psr\Http\Message\ServerRequestInterface;
 // @mago-expect lint:cyclomatic-complexity,too-many-methods
 final readonly class PostsApi
 {
-    private const array STATUSES = ['draft', 'scheduled', 'publishing', 'published', 'partial', 'failed', 'unknown'];
+    private const array STATUSES = [
+        'draft',
+        'scheduled',
+        'queued',
+        'publishing',
+        'published',
+        'partial',
+        'failed',
+        'unknown',
+    ];
 
     public function __construct(
         private Publishing $publishing,
@@ -33,6 +42,12 @@ final readonly class PostsApi
     public function index(ServerRequestInterface $request): array
     {
         $query = $request->getQueryParams();
+        if (array_key_exists('from', $query) || array_key_exists('to', $query)) {
+            return ['posts' => $this->publishing->between(
+                self::date($query['from'] ?? null),
+                self::date($query['to'] ?? null),
+            )];
+        }
         $statuses = array_values(array_filter(explode(',', (string) ($query['status'] ?? ''))));
         if (array_diff($statuses, self::STATUSES) !== []) {
             throw Failure::invalid('Filter by ' . implode(', ', self::STATUSES) . '.');
@@ -56,7 +71,8 @@ final readonly class PostsApi
 
     public function store(ServerRequestInterface $request): array
     {
-        return $this->publishing->create(PostRequest::fromApi(self::body($request)));
+        // The web client never waits on the sites: publishing now goes to the queue.
+        return $this->publishing->createQueued(PostRequest::fromApi(self::body($request)));
     }
 
     public function show(string $id): array
@@ -66,12 +82,15 @@ final readonly class PostsApi
 
     public function update(string $id, ServerRequestInterface $request): array
     {
-        return $this->publishing->update($id, PostRequest::fromApi([...self::body($request), 'requestId' => $id]));
+        return $this->publishing->updateQueued($id, PostRequest::fromApi([
+            ...self::body($request),
+            'requestId' => $id,
+        ]));
     }
 
     public function publish(string $id): array
     {
-        return $this->publishing->publish($id);
+        return $this->publishing->queue($id);
     }
 
     public function retry(string $id): array
@@ -109,6 +128,18 @@ final readonly class PostsApi
             ],
             body: (string) file_get_contents($media['path']),
         );
+    }
+
+    private static function date(mixed $value): \DateTimeImmutable
+    {
+        if (!is_string($value) || $value === '') {
+            throw Failure::invalid('Give both from and to as dates and times.');
+        }
+        try {
+            return new \DateTimeImmutable($value);
+        } catch (\Exception) {
+            throw Failure::invalid('from and to must be dates and times.');
+        }
     }
 
     private static function body(ServerRequestInterface $request): array

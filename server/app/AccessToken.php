@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App;
 
 /**
- * The password for the web client and the HTTP API: POSTSLOP_TOKEN in .env. Setup writes a random one, and you may
- * replace it with your own.
+ * The password for the web client and the HTTP API: POSTSLOP_TOKEN in .env. Without one, both are open to anyone
+ * who can reach the server.
  */
 final readonly class AccessToken
 {
@@ -15,12 +15,13 @@ final readonly class AccessToken
         private string $token,
     ) {}
 
+    public function required(): bool
+    {
+        return $this->read() !== '';
+    }
+
     public function read(): string
     {
-        $token = trim($this->token);
-        if ($token === '') {
-            throw new \RuntimeException('Set POSTSLOP_TOKEN in .env, or run php scripts/setup.php to create one.');
-        }
-        return $token;
+        return trim($this->token);
     }
 }

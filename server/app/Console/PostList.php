@@ -19,10 +19,11 @@ final readonly class PostList extends CliCommand
     {
         return <<<'TEXT'
             List posts, newest first
-            Usage: postslop posts [--status=LIST] [--limit=20] [--json]
+            Usage: postslop posts [--status=LIST] [--limit=20] [--from=TIME --to=TIME] [--json]
             Options:
-              --status=LIST  draft, scheduled, publishing, published, partial, failed or unknown, comma separated
+              --status=LIST  draft, scheduled, queued, publishing, published, partial, failed or unknown, comma separated
               --limit=N      How many, from 1 to 100
+              --from, --to   Posts published, scheduled or tried in this range, soonest first (as the calendar shows)
             TEXT;
     }
 
@@ -36,7 +37,15 @@ final readonly class PostList extends CliCommand
         if ($limit === false) {
             throw Failure::invalid('--limit must be a whole number from 1 to 100.');
         }
-        $page = $this->publishing->list($statuses, $limit);
+        $from = self::value($input, 'from');
+        $to = self::value($input, 'to');
+        if (($from === null) !== ($to === null)) {
+            throw Failure::invalid('Give both --from and --to.');
+        }
+        $page =
+            $from !== null && $to !== null
+                ? ['posts' => $this->publishing->between(self::time($from), self::time($to))]
+                : $this->publishing->list($statuses, $limit);
         if ($input->flag('json')) {
             $output->line(self::json($page));
             return self::OK;

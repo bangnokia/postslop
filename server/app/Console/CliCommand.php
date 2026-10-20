@@ -110,7 +110,7 @@ abstract readonly class CliCommand implements Command
         return match ($post['status']) {
             'partial' => self::PARTIAL,
             'failed' => self::FAILED,
-            'unknown', 'publishing' => self::UNKNOWN,
+            'unknown', 'queued', 'publishing' => self::UNKNOWN,
             default => self::OK,
         };
     }
@@ -164,6 +164,7 @@ abstract readonly class CliCommand implements Command
             'scheduled' => 'Scheduled for ' . new \DateTimeImmutable($post['scheduledAt'])
                 ->setTimezone(self::localZone())
                 ->format('D j M, H:i') . ' to ' . $platforms,
+            'queued' => 'Queued for ' . $platforms,
             'publishing' => 'Publishing to ' . $platforms,
             'published' => 'Published to ' . $platforms,
             'partial' => 'Partly published',

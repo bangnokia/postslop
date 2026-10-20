@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\AccessToken;
 use App\Core\Publishing;
 use App\Jobs\PublishDuePosts;
-use App\AccessToken;
 use App\Social\BlueskyPublisher;
 use App\Social\DevNullPublisher;
 use App\Social\SessionStore;
@@ -17,6 +17,7 @@ use Crab\Contracts\Container\Container;
 use Crab\Contracts\Database\Database;
 use Crab\Contracts\HttpClient\Client;
 use Crab\Contracts\Provider;
+use Crab\Contracts\Queue\Queue;
 use Crab\Contracts\Schedule\Schedule;
 
 /**
@@ -56,6 +57,7 @@ final class AppProvider implements Provider
                 ],
                 $container->get(Database::class),
                 $container->get(Cache::class),
+                $container->get(Queue::class),
                 config('postslop.lock_file'),
                 config('postslop.media_path'),
             );

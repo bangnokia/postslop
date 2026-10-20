@@ -89,9 +89,9 @@ final readonly class XBrowserProcess
                 if ($state['exitcode'] !== 0 || $offset !== strlen($payload)) {
                     throw new \RuntimeException(
                         'The X browser worker exited with code '
-                        . $state['exitcode']
-                        . ' without confirming its result.'
-                        . self::errorLine($errors),
+                            . $state['exitcode']
+                            . ' without confirming its result.'
+                            . self::errorLine($errors),
                     );
                 }
                 return $output;

@@ -12,7 +12,8 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
 /**
- * Postslop may run on another machine, so any host may reach it; the API answers only to its access token.
+ * Postslop may run on another machine, so any host may reach it; the API answers only to its access token, when one
+ * is set.
  */
 final readonly class TokenAccess implements Middleware
 {
@@ -24,7 +25,10 @@ final readonly class TokenAccess implements Middleware
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         if (str_starts_with($request->getUri()->getPath(), '/api/')) {
-            if (!hash_equals('Bearer ' . $this->token->read(), $request->getHeaderLine('Authorization'))) {
+            if (
+                $this->token->required()
+                && !hash_equals('Bearer ' . $this->token->read(), $request->getHeaderLine('Authorization'))
+            ) {
                 return Response::json(['error' => ['message' => 'Sign in with your Postslop access token.']], 401);
             }
             if (

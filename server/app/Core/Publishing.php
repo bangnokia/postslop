@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use App\Jobs\PublishPost;
 use App\PrivateFiles;
 use App\Social\ImageAttachment;
 use App\Social\Publisher;
 use Crab\Contracts\Cache\Cache;
 use Crab\Contracts\Database\Connection;
 use Crab\Contracts\Database\Database;
+use Crab\Contracts\Queue\Queue;
 use Crab\Database\DatabaseException;
 
 /**
@@ -27,10 +29,13 @@ final readonly class Publishing
     /**
      * @param array<string, Publisher> $publishers
      */
+    // The core is built once, from every service it uses.
+    // @mago-expect lint:excessive-parameter-list
     public function __construct(
         private array $publishers,
         private Database $db,
         private Cache $cache,
+        private Queue $queue,
         private string $lockFile,
         private string $mediaDirectory,
     ) {}
@@ -148,6 +153,46 @@ final readonly class Publishing
     }
 
     /**
+     * As create(), except that a post to publish now is handed to the queue and answered at once as queued,
+     * so a client never waits on the sites. Repeating the request still never sends it twice.
+     */
+    public function createQueued(PostRequest $request): array
+    {
+        return $request->mode === 'now'
+            ? $this->queue($this->create($request->as('draft'))['id'])
+            : $this->create($request);
+    }
+
+    /**
+     * As update(), except that publishing now is handed to the queue, as in createQueued().
+     */
+    public function updateQueued(string $id, PostRequest $request): array
+    {
+        return $request->mode === 'now'
+            ? $this->queue($this->update($id, $request->as('draft'))['id'])
+            : $this->update($id, $request);
+    }
+
+    /**
+     * Marks a draft or a scheduled post as queued and pushes the job that publishes it, in one transaction, so
+     * the job exists exactly when the queued post does. A post already on its way is returned as it is.
+     */
+    public function queue(string $id): array
+    {
+        $this->db->transaction(function (Connection $tx) use ($id): void {
+            $queued = $tx
+                ->table('posts')
+                ->where('id', $id)
+                ->whereIn('status', self::EDITABLE)
+                ->update(['status' => 'queued', 'updated_at' => self::now()]);
+            if ($queued > 0) {
+                $this->queue->within($tx)->push(PublishPost::class, id: $id);
+            }
+        });
+        return $this->find($id);
+    }
+
+    /**
      * Schedules a draft, moves a scheduled post, or with null returns it to the drafts.
      */
     public function schedule(string $id, ?\DateTimeImmutable $at): array
@@ -187,7 +232,7 @@ final readonly class Publishing
         $lock = $this->lock();
         try {
             $post = $this->row($id) ?? throw Failure::notFound();
-            if (!in_array($post['status'], self::EDITABLE, true)) {
+            if (!in_array($post['status'], [...self::EDITABLE, 'queued'], true)) {
                 return $this->find($id);
             }
             $platforms = json_decode($post['platforms'], true, flags: JSON_THROW_ON_ERROR);
@@ -224,7 +269,7 @@ final readonly class Publishing
         $lock = $this->lock();
         try {
             $post = $this->row($id) ?? throw Failure::notFound();
-            if (in_array($post['status'], [...self::EDITABLE, 'publishing'], true)) {
+            if (in_array($post['status'], [...self::EDITABLE, 'queued', 'publishing'], true)) {
                 throw Failure::invalid('This post has not finished publishing.');
             }
             $failed = $this->db
@@ -250,19 +295,23 @@ final readonly class Publishing
     }
 
     /**
-     * Publishes every scheduled post that is due, oldest first.
+     * Publishes every scheduled post that is due, oldest first, and any queued post whose job could not send it,
+     * such as one that found another publication holding the lock.
      *
      * @return list<array>
      */
     public function runDue(?\DateTimeImmutable $now = null): array
     {
         $now ??= new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $due = $this->db
-            ->table('posts')
-            ->where('status', 'scheduled')
-            ->where('scheduled_at', '<=', $now->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'))
-            ->orderBy('scheduled_at')
-            ->pluck('id');
+        $due = [
+            ...$this->db->table('posts')->where('status', 'queued')->orderBy('updated_at')->pluck('id'),
+            ...$this->db
+                ->table('posts')
+                ->where('status', 'scheduled')
+                ->where('scheduled_at', '<=', $now->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'))
+                ->orderBy('scheduled_at')
+                ->pluck('id'),
+        ];
         $published = [];
         foreach ($due as $id) {
             try {
@@ -281,7 +330,7 @@ final readonly class Publishing
     public function find(string $id): array
     {
         $post = $this->row($id) ?? throw Failure::notFound();
-        if (!in_array($post['status'], self::EDITABLE, true)) {
+        if (!in_array($post['status'], [...self::EDITABLE, 'queued'], true)) {
             $post = $this->settle($post);
         }
         return $this->present([$post])[0];
@@ -307,6 +356,56 @@ final readonly class Publishing
             'posts' => $this->present($rows),
             'next' => $more ? $rows[$limit - 1]['created_at'] : null,
         ];
+    }
+
+    /**
+     * Posts whose time on a calendar falls from $from up to $to, soonest first: when each was published, else when
+     * it is scheduled, else when it was last tried. Drafts have no time and are left out.
+     *
+     * @return list<array>
+     */
+    public function between(\DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $utc = new \DateTimeZone('UTC');
+        [$start, $end] = [
+            $from->setTimezone($utc)->format('Y-m-d\TH:i:s\Z'),
+            $to->setTimezone($utc)->format('Y-m-d\TH:i:s\Z'),
+        ];
+        if ($start >= $end) {
+            throw Failure::invalid('The end of the range must come after its start.');
+        }
+        if (($to->getTimestamp() - $from->getTimestamp()) > (62 * 86_400)) {
+            throw Failure::invalid('Ask for at most 62 days at a time.');
+        }
+        $rows = $this->db
+            ->table('posts')
+            ->where('status', '!=', 'draft')
+            ->where(static fn($query) => $query
+                ->where(
+                    static fn($inner) => $inner
+                        ->whereNotNull('published_at')
+                        ->where('published_at', '>=', $start)
+                        ->where('published_at', '<', $end),
+                )
+                ->orWhere(
+                    static fn($inner) => $inner
+                        ->whereNull('published_at')
+                        ->whereNotNull('scheduled_at')
+                        ->where('scheduled_at', '>=', $start)
+                        ->where('scheduled_at', '<', $end),
+                )
+                ->orWhere(
+                    static fn($inner) => $inner
+                        ->whereNull('published_at')
+                        ->whereNull('scheduled_at')
+                        ->where('updated_at', '>=', $start)
+                        ->where('updated_at', '<', $end),
+                ))
+            ->limit(500)
+            ->get();
+        $time = static fn(array $row): string => $row['published_at'] ?? $row['scheduled_at'] ?? $row['updated_at'];
+        usort($rows, static fn(array $a, array $b): int => $time($a) <=> $time($b));
+        return $this->present($rows);
     }
 
     /**
