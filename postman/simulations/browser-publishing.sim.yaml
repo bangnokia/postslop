@@ -1,9 +1,0 @@
-simulation: postslop-browser-publishing
-routing: path
-mocks:
-  - routeKey: x
-    path: ../mocks/x-browser/config.yaml
-  - routeKey: bluesky
-    path: ../mocks/bluesky/config.yaml
-  - routeKey: dev-null
-    path: ../mocks/dev-null/config.yaml

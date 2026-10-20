@@ -1,9 +1,0 @@
-version: 1
-name: Postslop dev-null website fixture
-slug: postslop-dev-null
-protocol: http
-interceptRequests: true
-scenarios:
-  - name: default
-    path: ./default.js
-    default: true

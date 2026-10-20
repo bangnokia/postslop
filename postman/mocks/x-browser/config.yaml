@@ -1,9 +1,0 @@
-version: 1
-name: Postslop X browser website fixture
-slug: postslop-x-browser
-protocol: http
-interceptRequests: true
-scenarios:
-  - name: default
-    path: ./default.js
-    default: true

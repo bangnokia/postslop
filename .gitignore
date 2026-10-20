@@ -1,11 +1,11 @@
 .env
 .env.*
-!/.env.example
-/vendor/
-/node_modules/
-/browser-worker/node_modules/
-/storage/**
-!/storage/.gitkeep
+!.env.example
+/server/vendor/
+node_modules/
+/server/storage/**
+!/server/storage/.gitkeep
+/server/public/
 /.DS_Store
 *.log
 *.sqlite

@@ -1,102 +1,114 @@
 # Postslop
 
-Write once and publish text and images to **X, Bluesky, and dev-null.sh** using your existing browser sessions. Postslop runs locally on [CrabPHP](https://github.com/crabphp/framework); it does not need developer API keys.
+Write once and publish text and images to **X, Bluesky and dev-null.sh** using the sessions you are already signed in with. No developer API keys. Postslop runs on your Mac, on [CrabPHP](https://github.com/crabphp/framework).
+
+```
+ Raycast ──────┐
+ AI / scripts ─┼─▶ bin/postslop (CLI) ─┐
+ scheduler ────┘                       ▼
+                               Core (server/app/Core) ── SQLite, sessions, images
+                                       ▲
+ web client ──▶ /api/v1 (HTTP) ────────┘
+```
+
+One core holds every rule: drafts, scheduling, history, and never posting the same thing twice. It has two front doors. The **command line** runs the core directly, so Raycast, AI agents and the scheduler need no server running. The **HTTP API** serves the web client.
+
+| Folder | What |
+| --- | --- |
+| `server/` | The core, the CLI, the HTTP API, the X browser worker, private storage |
+| `clients/web/` | The web client: Vite, React, TypeScript |
+| `clients/raycast/` | The Raycast extension, which calls the CLI |
+| `docs/` | [HTTP API](docs/api.md) and [testing against fake sites](docs/testing.md) |
+
+## Install
+
+Requires PHP 8.4+ with `fileinfo` and `gd`, Composer, Node 22+ and Python 3. Composer installs CrabPHP from GitHub at the exact commit in `composer.lock`.
+
+```sh
+cd server
+composer install
+cp -n .env.example .env        # only on a new checkout
+php scripts/setup.php          # private storage, local token, database
+cd browser-worker && npm ci && npm run setup && cd ..   # X's private headless browser
+bin/postslop setup             # import your signed-in sessions from Chrome
+```
+
+To call it as `postslop` from anywhere, link it onto your path: `ln -s "$PWD/bin/postslop" /opt/homebrew/bin/postslop`.
+
+## Command line
+
+```sh
+postslop accounts                          # which accounts are ready
+postslop post "Hello"                      # save a draft
+postslop post "Hello" --now                # publish now
+postslop post "Hello" --at="tomorrow 9am"  # schedule (local time)
+postslop post "Look" --image=shot.png --to=x,bluesky --now
+postslop posts --status=scheduled          # history, newest first
+postslop show ID | publish ID | retry ID | schedule ID --at=… | delete ID
+postslop scheduler install                 # publish scheduled posts on time
+postslop serve                             # web client at http://127.0.0.1:8087
+```
+
+**A post is a draft unless you say `--now` or give a time.** So an AI agent can prepare posts safely, and nothing goes public without an explicit flag. `postslop help post` lists every option.
+
+For scripts and agents, every command takes `--json` and prints exactly one JSON document, errors included. `--input=-` reads a whole post as JSON from standard input, with images by path and their descriptions. Exit codes are stable: `0` ok, `2` invalid, `3` partly published, `4` failed, `5` unknown outcome, `6` busy, `7` conflict, `8` not found. `--request-id=UUID` makes a command safe to repeat, and `--dry-run` checks a post and the accounts without saving anything.
+
+### Scheduling
+
+`postslop scheduler install` adds a launchd job that runs `postslop run-due` once a minute. Nothing stays running in between. Scheduled posts then go out on time even with the web client and Raycast closed. `postslop scheduler status` checks the job, and `uninstall` removes it. Logs are in `server/storage/logs/scheduler.log`.
+
+## Web client
+
+`postslop serve` (or `php cua serve --daemon` in `server/`) serves the built client at <http://127.0.0.1:8087>:
+
+- **Compose**: per-site character counters, paste, drop or pick images with descriptions, publish now or schedule, and save drafts. The unsent draft, images included, is kept in this browser.
+- **Posts**: the history, filtered by scheduled, drafts, needs attention or published. Each post shows its result on each site, with links.
+- **Post**: edit, publish, reschedule or delete a draft. Retry only the failed destinations of a sent post.
+- **Accounts**: which sessions are ready, and why the others are not.
+
+Build it once, and again after changing it:
+
+```sh
+cd clients/web
+npm ci
+npm run build    # writes server/public
+npm run dev      # or work on it at http://127.0.0.1:5173 against the running server
+```
 
 ## Raycast
 
-The **Postslop** extension keeps composing, attachments, publishing, and results inside Raycast:
-
-- Write in the multiline textarea and choose destinations.
-- **⌘⇧V** attaches an image from the clipboard; the Images field also accepts files.
-- Attachments appear in a list below the textarea, with removal and optional descriptions.
-- **⌘Enter** hands off publishing to a background command and closes Raycast. A brief completion toast/HUD reports the result; full success clears the composer and failures retain the draft.
-- Drafts survive leaving the command. The local API server starts automatically if needed.
-
-See [the extension's local installation and usage guide](raycast/README.md). A background helper processes images without opening a separate app window. The web composer remains available alongside Raycast; both use the same Postslop API.
-
-## Web composer
-
-Open <http://127.0.0.1:8087>. It shows verified account handles, supports pasted or selected images, and saves the draft including attachments in this browser. Use the Publish button or **⌘Enter**; ordinary Enter adds a line in the web textarea.
-
-When all selected destinations publish successfully, the composer clears its text, attachments, and saved draft automatically. Failed or uncertain results keep the draft for recovery.
-
-Both composers support up to four images, or three when dev-null.sh is selected. Images are resized/compressed locally to JPEG of at most 1 MiB each. Transparent backgrounds become white. Platform text limits are checked again by each publishing adapter.
-
-## Run locally
-
-Requires PHP 8.4+ and Composer. Composer installs CrabPHP from GitHub at the exact commit recorded in `composer.lock`; the dependency uses `dev-main` until a tagged release is available. Image inspection needs PHP `fileinfo` and `gd`; the Raycast composer additionally needs Raycast, Node, and the Swift command-line compiler on macOS.
-
-```sh
-set -e
-composer install
-# Only on a new checkout; preserve an existing .env.
-cp -n .env.example .env
-php scripts/setup.php
-php cua serve
-```
-
-The server binds to `127.0.0.1:8087`. Use `php cua serve --daemon` to run it in the background, `php cua reload` after backend changes, and `php cua stop` to stop it. Logs are in `storage/logs/server.log`. The health endpoint is `/up`.
-
-X publishing uses Postslop's background browser worker. Install its pinned dependencies and private browser runtime once:
-
-```sh
-cd browser-worker
-npm ci
-npm run setup
-```
-
-Normal publishing opens no browser window. The worker uses its own private profile, verifies the intended account, and operates X's website controls. [Worker details and checks](browser-worker/README.md).
+The **Postslop** extension composes inside Raycast. It runs the CLI, so it needs no server. Press ⌘⇧V to paste an image, and ⌘Enter to hand the post to a background command and close Raycast. A HUD reports the result. See [its guide](clients/raycast/README.md).
 
 ## Browser sessions
 
-Verify the active account on each site, then import the Firefox profile explicitly:
+`postslop setup` reads Chrome's last used profile, asks which account is signed in on each site, and imports only those three sites' sessions into `server/storage/sessions/`. Check the accounts in the browser first. Postslop refuses a session that belongs to another account than the handle you give. Chrome encrypts its cookies, so macOS asks once to let Postslop use "Chrome Safe Storage": choose Allow. `--browser=firefox` imports from Firefox's default profile instead, `--profile=DIR` picks another profile, and `--check-only` reads without saving.
 
-```sh
-python3 scripts/import_firefox_sessions.py \
-  --profile '/absolute/path/to/firefox/profile' \
-  --x-handle YOUR_X_HANDLE \
-  --bluesky-handle YOUR_BLUESKY_HANDLE \
-  --dev-null-handle YOUR_DEV_NULL_HANDLE
-```
+Under the hood, `scripts/import_chrome_sessions.py` and `scripts/import_firefox_sessions.py` read the browser's files without closing it or changing anything, and make no network requests. They skip partitioned and container cookies and X's multiple-account cookie, and keep only the active Bluesky account. Chrome's Bluesky session is read from its localStorage LevelDB files.
 
-`--check-only` checks capture without exporting. The importer reads stable private SQLite snapshots, including committed WAL data, without closing Firefox. It imports only the three sites, skips partitioned/container cookies and X's multiple-account cookie, and keeps only the active Bluesky account.
+X runs in the app-owned headless browser, which checks the signed-in profile before posting. dev-null.sh uses cookies and CSRF headers through Crab's HTTP client. Bluesky keeps its session tokens from localStorage and refreshes them when needed. Sessions expire and sites change: an unavailable account shows a reason, so import it again when needed.
 
-X imports cookies into the app-owned headless browser. Dev-null.sh uses cookies and CSRF headers through Crab's HTTP client. Bluesky keeps its active session tokens in browser localStorage; Postslop refreshes those tokens when necessary. The adapters verify the account against the imported handle before posting. X's website constructs its posting request; dev-null.sh uses its current Inertia form and image-upload behavior.
+X can accept a session for account checks while rejecting a post. Error 226 is an explicit automation rejection. Error 344 is reported as an action limit, and is not by itself proof that a daily quota ran out. Postslop keeps the draft and the failed result, and never retries automatically. The former HTTP-only X adapter remains available with `POSTSLOP_X_TRANSPORT=http` for diagnostics; it is never an automatic fallback.
 
-Sessions expire and websites change. An unavailable account shows a reason; reimport the session when necessary. The UI never treats a cookie file's existence as proof of a working sign-in.
+For a separately verified Chrome session, `scripts/import_chrome_x.py --profile '/absolute/path/to/Chrome/Default' --expected-handle YOUR_X_HANDLE` writes only a private `storage/sessions/x-chrome.json` candidate, to check against the intended account before it replaces the active session.
 
-X can accept a session for account checks while rejecting a publishing request. Error 226 is an explicit automation rejection; error 344 is reported by X as an action limit and is not, by itself, proof that an account-wide daily quota was exhausted. Postslop preserves the draft and the failed result, and does not retry automatically or switch to manual browser posting. The former HTTP-only X adapter remains available with `POSTSLOP_X_TRANSPORT=http` for explicit diagnostics and its existing fixtures; it is never an automatic fallback.
+## Never twice
 
-For a separately verified Chrome Default session on this Mac, `scripts/import_chrome_x.py --profile '/absolute/path/to/Chrome/Default' --expected-handle YOUR_X_HANDLE` writes only a private `storage/sessions/x-chrome.json` candidate. It reads the narrowly scoped X cookies using Chrome's existing Keychain entry. The candidate must be checked against the intended account over HTTP before it replaces the active session. Importing a session does not establish that X will accept writes.
-
-## Results and duplicates
-
-Each submission has a request ID, payload fingerprint, and private receipt. Before every remote side effect, the destination is recorded durably. Repeating an unchanged request ID returns its recorded result without sending it again. Changing a request's content under the same ID is rejected.
-
-A confirmed post includes its clean destination URL. A lost or ambiguous response remains unknown, and no automatic publishing retry occurs. Keep the draft and use Check Result. A saved dev-null.sh post may await moderation; it must not be submitted again while awaiting review.
+Each post's ID is its request ID, with a fingerprint of its content. Before contacting each site, Postslop records that destination as unknown. Repeating an ID returns the recorded result without sending again, and different content under the same ID is refused. A lost or ambiguous response stays **unknown** and is never retried: check the account. **Retry** resends only the destinations that definitely failed. A dev-null.sh post that is saved counts as published, even while it awaits moderation.
 
 ## Private local data
 
-`storage/`, `.env`, dependencies, compiled native binaries, and local drafts are excluded from Git. Session files use `0600` permissions in a `0700` directory. Social credentials stay in `storage/sessions/`; Raycast reads only `storage/client-token` for the local server. The local API checks the host, origin, and bearer token, and the server does not expose private storage through HTTP.
-
-[Local API contract](docs/api.md). [Reproducible HTTP simulation](postman/README.md).
+`server/storage/`, `.env`, dependencies, the built web client and compiled helpers stay out of Git. The database, images and sessions have private permissions, in folders only you can read. The HTTP API checks the host, the origin and a local bearer token, and never serves private storage. The web client reads the token from its page. Raycast uses the CLI and needs no token.
 
 ## Checks
 
 ```sh
-composer format:check
-composer lint
-php tests/core.php
-php tests/browser-publisher.php
-php tests/x-rejections.php
-php tests/dev-null-review.php
-node --check public/app.js
-cd browser-worker
-npm test
-cd ../raycast
-npm run typecheck
-npm run lint
-npm run build
+cd server
+composer format:check && composer lint
+php tests/core.php && php tests/api.php
+php tests/x-rejections.php && php tests/browser-publisher.php
+(cd browser-worker && npm test)
+(cd ../clients/web && npm run build)
+(cd ../clients/raycast && npm run typecheck && npm run lint && npm run build)
 ```
 
-The core checks cover image validation, repeated and interrupted submissions, locking, private writes, and crash recovery. The Postman simulation runs the real Crab HTTP client against local upstream stand-ins. Live acceptance is checked separately; a fixture pass alone is not a claim that a social site accepted a post.
+The core checks cover repeated and interrupted submissions, locking, drafts, scheduling, retries, validation and private media. [Testing against fake sites](docs/testing.md) runs the real server, CLI, browser worker and Raycast client end to end. A pass against fakes is not a claim that a real site accepted a post.

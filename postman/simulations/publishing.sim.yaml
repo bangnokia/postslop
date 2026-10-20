@@ -1,9 +1,0 @@
-simulation: postslop-publishing
-routing: path
-mocks:
-  - routeKey: x
-    path: ../mocks/x/config.yaml
-  - routeKey: bluesky
-    path: ../mocks/bluesky/config.yaml
-  - routeKey: dev-null
-    path: ../mocks/dev-null/config.yaml

@@ -1,5 +1,11 @@
 # Postslop conventions
 
+- Keep one core (`server/app/Core`) with two thin front doors: the CLI (`server/bin/postslop`, used by Raycast, AI agents and the scheduler, needing no server) and the HTTP API (`/api/v1`, used by the web client in `clients/web`). Put every rule in the core first, then expose it through both doors.
+- Store posts, deliveries and images in SQLite through the core; never publish around it.
+- While in development, keep one migration file per table and edit it in place instead of adding migrations; `migrate:rollback` then `migrate` rebuilds the database.
+- A CLI post is a draft unless `--now` or a scheduled time is given explicitly, so AI agents never publish by default.
+- Build the web client with Vite, React and TypeScript in `clients/web`; it builds into `server/public`, which is not committed.
+- Test against the plain Node fake sites in `server/tests/fakes`, never real accounts; do not reintroduce Postman.
 - Use a versioned CrabPHP Composer dependency pinned by `composer.lock`; never depend on a local framework directory or path repository.
 - Use the user's local browser sessions for X, Bluesky, and dev-null.sh; do not require social API keys.
 - An explicit click on Publish submits immediately without a second confirmation once publishing is implemented.
@@ -8,11 +14,11 @@
 - Keep normal publishing inside Postslop/Raycast without opening visible browser windows; any background browser worker must be owned by the app.
 - Keep the Postslop composer entirely inside the Raycast extension; use its native controls and an explicit Paste Image action (⌘⇧V), without launching a separate macOS composer app.
 - Preserve drafts when publishing fails and clear them after full success in both clients.
-- Retain the web UI alongside the Raycast extension; both use the same Postslop API, with future server hosting in mind.
+- Retain the web client alongside the Raycast extension; both go through the same core, with future server hosting in mind.
 - Keep the Raycast UI responsive: hand publishing to a background command, close the composer after handoff, and show brief completion HUD/toast feedback instead of requiring users to wait in Raycast.
 - Use the working native Raycast form with an attachment list below the textarea; image previews are not required in Raycast. Keep image thumbnails in the web composer.
 - Always open Raycast Postslop on a fresh New Post form by default; preserve earlier drafts and results in Saved Posts, including posts still publishing in the background.
-- Keep session values private, local, and uncommitted; store imported sessions only under `storage/sessions/` with restricted permissions.
+- Keep session values private, local, and uncommitted; store imported sessions only under `server/storage/sessions/` with restricted permissions.
 - Never commit or push keys, credentials, tokens, session data, or other secrets; audit staged files before committing and pushing.
 - Verify that credentials match the intended account and that sign-in succeeds before sharing credentials or submitting them for review.
 - Never write or run tests for database seeders.

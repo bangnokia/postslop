@@ -1,0 +1,59 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+// The Postslop command line: the core, in this process, with no server needed.
+
+use Crab\Contracts\Database\Migrator;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+const COMMANDS = [
+    'post' => 'post:create',
+    'posts' => 'post:list',
+    'show' => 'post:show',
+    'publish' => 'post:publish',
+    'retry' => 'post:retry',
+    'schedule' => 'post:schedule',
+    'delete' => 'post:delete',
+    'run-due' => 'post:run-due',
+    'accounts' => 'account:list',
+    'setup' => 'account:setup',
+    'scheduler' => 'scheduler:install',
+];
+
+$arguments = array_slice($argv, 1);
+$name = $arguments[0] ?? null;
+if ($name === null || in_array($name, ['help', '--help', '-h'], true) && !isset($arguments[1])) {
+    echo <<<'TEXT'
+        Postslop: write once, publish to X, Bluesky and dev-null.sh.
+
+          postslop setup                 Import your signed-in sessions from Chrome (or --browser=firefox)
+          postslop accounts              Show which accounts are ready
+          postslop post "Text"           Save a draft (add --now to publish, --at=TIME to schedule)
+          postslop posts                 List posts, newest first
+          postslop show ID               Show a post and its results
+          postslop publish ID            Publish a draft or scheduled post now
+          postslop schedule ID --at=TIME Schedule or reschedule a draft
+          postslop retry ID              Retry only the destinations that failed
+          postslop delete ID             Delete a draft or scheduled post
+          postslop scheduler install     Publish scheduled posts on time with launchd
+          postslop serve                 Serve the web client and API at http://127.0.0.1:8087
+
+        Add --json for machine-readable output, and --help to any command for its options.
+        Exit codes: 0 ok, 2 invalid, 3 partly published, 4 failed, 5 unknown outcome, 6 busy, 7 conflict, 8 not found.
+
+        TEXT;
+    exit(0);
+}
+if ($name === 'help') {
+    $arguments = [COMMANDS[$arguments[1]] ?? $arguments[1], '--help'];
+} else {
+    $arguments[0] = COMMANDS[$name] ?? $name;
+}
+
+$app = require dirname(__DIR__) . '/app.php';
+// Bring the database up to date first, so an update never needs a separate step.
+$app->container->get(Migrator::class)->run();
+exit($app->console->run($arguments));
