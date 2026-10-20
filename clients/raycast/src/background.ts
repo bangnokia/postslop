@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { PostslopClient } from "./client";
+import type { Postslop } from "./client";
 import { DraftStore, fullyPublished, validateResult } from "./draft.ts";
 import type { Draft } from "./draft";
 
@@ -34,7 +34,7 @@ export interface TaskNotice {
 
 export async function runTask(
   store: DraftStore,
-  client: PostslopClient,
+  client: Postslop,
   id: string,
 ): Promise<TaskNotice | undefined> {
   const draft = store.loadTask(id);

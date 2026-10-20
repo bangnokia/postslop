@@ -1,6 +1,6 @@
 # Postslop for Raycast
 
-Search **Postslop** in Raycast to open a fresh **New Post** composer without opening a separate app. Previous drafts and results are preserved in **Saved Posts**. The extension runs Postslop's command line, `server/bin/postslop`, so no server needs to be running. The web client, with history and scheduling, is at <http://127.0.0.1:8087> after `postslop serve`.
+Search **Postslop** in Raycast to open a fresh **New Post** composer without opening a separate app. Previous drafts and results are preserved in **Saved Posts**. The extension runs Postslop's command line, `server/bin/postslop`, so no server needs to be running. It can instead post through a Postslop on another machine: see [Local or server](#local-or-server). The web client, with history and scheduling, is at <http://127.0.0.1:8087> after `postslop serve`.
 
 ## Install locally
 
@@ -39,7 +39,11 @@ Existing drafts from the former macOS composer load from the same private `nativ
 
 Social sessions stay in Postslop's `server/storage/sessions.json`; the extension never reads them. It hands each post to `postslop post --input=- --now --json` with its request ID, and reads results with `postslop show`. Every post Raycast sends also appears in the web client's history. Draft JSON and image copies live in Raycast's extension support directory with restricted permissions. Successfully published draft images and removed attachments are deleted unless a Saved Post still references them; original source images are preserved.
 
-The extension works with a Postslop on this Mac. Remote hosting would need the command line to reach a remote core, which is not built yet.
+## Local or server
+
+With the **Server URL** preference empty, the extension uses the local checkout in **Postslop Server Folder**, as above.
+
+When Postslop runs on another machine, set **Server URL** (such as `https://postslop.example.com`) and **Access Token** (that server's `POSTSLOP_TOKEN`; leave it empty if it has none). The extension then needs no PHP or checkout on this Mac. It sends each post with its images and request ID to `POST /api/v1/posts`, waits for the server's queue to publish it, and reads results with `GET /api/v1/posts/{id}`. A post the server has not finished after two and a half minutes is reported as unknown, and **Check Result** finds its outcome later. The posts appear in that server's web client. Social sessions live on the server; send them there with `postslop setup --to=URL`.
 
 ## Development
 

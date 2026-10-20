@@ -19,7 +19,7 @@ import {
 } from "@raycast/api";
 import { useEffect, useRef, useState } from "react";
 import { join } from "node:path";
-import { PostslopClient, ServerStatus } from "./client";
+import { clientFor, Preferences, ServerStatus } from "./client";
 import {
   Attachment,
   cleanPostURL,
@@ -87,12 +87,8 @@ function SavedPosts({
 
 export default function Postslop() {
   const { push } = useNavigation();
-  const [client] = useState(
-    () =>
-      new PostslopClient(
-        getPreferenceValues<{ projectPath?: string }>().projectPath ||
-          "/Users/daudau/Code/bangnokia/postslop/server",
-      ),
+  const [client] = useState(() =>
+    clientFor(getPreferenceValues<Preferences>()),
   );
   const store = useRef<DraftStore | undefined>(undefined);
   const current = useRef<Draft | undefined>(undefined);
@@ -102,7 +98,7 @@ export default function Postslop() {
   const [loadingError, setLoadingError] = useState<string>();
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string>();
-  const [notice, setNotice] = useState("Connecting to local Postslop…");
+  const [notice, setNotice] = useState("Connecting to Postslop…");
   const [formVersion, setFormVersion] = useState(0);
 
   async function refreshAccounts() {

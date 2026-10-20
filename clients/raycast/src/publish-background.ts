@@ -6,7 +6,7 @@ import {
   PopToRootType,
 } from "@raycast/api";
 import { runTask, TaskNotice } from "./background";
-import { PostslopClient } from "./client";
+import { clientFor, Preferences } from "./client";
 import { DraftStore } from "./draft";
 
 export default async function PublishBackground({
@@ -15,10 +15,7 @@ export default async function PublishBackground({
   if (!launchContext?.taskId) return;
   // A user-initiated no-view command can keep working after hiding Raycast and can use feedback APIs.
   await showHUD("Posting…", { popToRootType: PopToRootType.Immediate });
-  const client = new PostslopClient(
-    getPreferenceValues<{ projectPath?: string }>().projectPath ||
-      "/Users/daudau/Code/bangnokia/postslop/server",
-  );
+  const client = clientFor(getPreferenceValues<Preferences>());
   let notice: TaskNotice | undefined;
   try {
     notice = await runTask(
