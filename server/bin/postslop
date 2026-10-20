@@ -20,7 +20,6 @@ const COMMANDS = [
     'run-due' => 'post:run-due',
     'accounts' => 'account:list',
     'setup' => 'account:setup',
-    'scheduler' => 'scheduler:install',
 ];
 
 $arguments = array_slice($argv, 1);
@@ -38,8 +37,7 @@ if ($name === null || in_array($name, ['help', '--help', '-h'], true) && !isset(
           postslop schedule ID --at=TIME Schedule or reschedule a draft
           postslop retry ID              Retry only the destinations that failed
           postslop delete ID             Delete a draft or scheduled post
-          postslop scheduler install     Publish scheduled posts on time with launchd
-          postslop serve                 Serve the web client and API at http://127.0.0.1:8087
+          postslop serve                 Serve the web client and API, and publish scheduled posts on time
 
         Add --json for machine-readable output, and --help to any command for its options.
         Exit codes: 0 ok, 2 invalid, 3 partly published, 4 failed, 5 unknown outcome, 6 busy, 7 conflict, 8 not found.

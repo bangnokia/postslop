@@ -19,7 +19,7 @@ if (!is_file($path)) {
     try {
         $file = fopen($path, 'x');
         if ($file === false) {
-            throw new RuntimeException('Could not create the local access token.');
+            throw new RuntimeException('Could not create the access token.');
         }
         fwrite($file, bin2hex(random_bytes(32)) . "\n");
         fclose($file);

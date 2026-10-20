@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Core\Publishing;
-use App\LocalToken;
+use App\Jobs\PublishDuePosts;
+use App\AccessToken;
 use App\Social\BlueskyPublisher;
 use App\Social\DevNullPublisher;
 use App\Social\SessionStore;
@@ -16,6 +17,7 @@ use Crab\Contracts\Container\Container;
 use Crab\Contracts\Database\Database;
 use Crab\Contracts\HttpClient\Client;
 use Crab\Contracts\Provider;
+use Crab\Contracts\Schedule\Schedule;
 
 /**
  * Where the application's own services are bound.
@@ -25,8 +27,8 @@ final class AppProvider implements Provider
     public function register(Container $container): void
     {
         $container->singleton(
-            LocalToken::class,
-            static fn(): LocalToken => new LocalToken(config('postslop.token_path')),
+            AccessToken::class,
+            static fn(): AccessToken => new AccessToken(config('postslop.token_path')),
         );
         $container->singleton(
             SessionStore::class,
@@ -58,5 +60,7 @@ final class AppProvider implements Provider
                 config('postslop.media_path'),
             );
         });
+        // `serve` runs the schedule and the queue when SERVER_SCHEDULE and SERVER_QUEUE are on.
+        $container->get(Schedule::class)->job(PublishDuePosts::class);
     }
 }

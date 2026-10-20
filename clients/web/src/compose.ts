@@ -1,5 +1,14 @@
 import type { NewImage, Platform } from "./api";
 
+// crypto.randomUUID() exists only on https or localhost, and Postslop may be opened over plain http on another machine.
+export function uuid(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const URL_PATTERN = /https?:\/\/\S+/g;
 // X counts these scripts as two characters each.
@@ -93,7 +102,7 @@ export function saveDraft(draft: LocalDraft | null): Promise<void> {
 }
 
 export function blankDraft(platforms: Platform[]): LocalDraft {
-  return { requestId: crypto.randomUUID(), text: "", platforms, images: [], scheduledAt: "" };
+  return { requestId: uuid(), text: "", platforms, images: [], scheduledAt: "" };
 }
 
 /** A datetime-local value, which has no zone, read as this browser's local time. */

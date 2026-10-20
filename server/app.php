@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\CoreFailures;
-use App\Http\LocalAccess;
+use App\Http\TokenAccess;
 use App\Providers\AppProvider;
 use Crab\App;
 
@@ -14,6 +14,6 @@ return App::configure(__DIR__)
     ->withProviders([
         AppProvider::class,
     ])
-    ->withMiddleware(append: [CoreFailures::class], prepend: [LocalAccess::class])
+    ->withMiddleware(append: [CoreFailures::class], prepend: [TokenAccess::class])
     ->withRouting(routes: 'routes/web.php', commands: 'routes/console.php', health: '/up')
     ->create();

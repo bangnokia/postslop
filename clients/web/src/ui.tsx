@@ -52,7 +52,15 @@ export function PlatformIcon({ platform }: { platform: Platform }) {
         </svg>
       </span>
     );
-  return <span className="network-icon terminal-icon" aria-hidden="true">&gt;_</span>;
+  // dev-null.sh's own mark, from https://dev-null.sh/favicon.svg.
+  return (
+    <span className="network-icon dev-null-icon" aria-hidden="true">
+      <svg viewBox="1.6 1.5 45 45">
+        <path className="ink" d="M2 42h10L26 6H16Z" />
+        <path className="accent" fillRule="evenodd" clipRule="evenodd" d="M17.81 43.5h13.22L46.19 4.5H32.97ZM22.19 40.5l12.84-33h6.78l-12.84 33Z" />
+      </svg>
+    </span>
+  );
 }
 
 const STATUS_LABELS: Record<PostStatus, string> = {

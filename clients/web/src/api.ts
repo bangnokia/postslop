@@ -12,6 +12,8 @@ export interface Account {
   available: boolean;
   handle?: string;
   reason?: string;
+  // What went wrong underneath the reason, such as the background browser's own error.
+  detail?: string;
   maxImages: number;
   textLimit: number;
 }
@@ -75,7 +77,31 @@ export class ApiError extends Error {
   }
 }
 
-const token = document.querySelector<HTMLMetaElement>('meta[name="postslop-token"]')?.content ?? "";
+// The access token is the password of this Postslop: kept in this browser after signing in.
+const TOKEN_KEY = "postslop-token";
+
+export function storedToken(): string {
+  try {
+    return localStorage.getItem(TOKEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function signIn(token: string) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function signOut() {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Nothing was stored.
+  }
+  window.location.reload();
+}
+
+const headers = () => ({ Authorization: `Bearer ${storedToken()}` });
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   let response: Response;
@@ -83,7 +109,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
     response = await fetch(`/api/v1${path}`, {
       method,
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...headers(),
         Accept: "application/json",
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       },
@@ -92,6 +118,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   } catch {
     throw new ApiError("Postslop is not reachable. Start it with: postslop serve", "offline", 0);
   }
+  if (response.status === 401) signOut();
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => null);
   if (!response.ok) {
@@ -117,7 +144,7 @@ export const api = {
   remove: (id: string) => call<void>("DELETE", `/posts/${id}`),
   // Images need the token too, so they are fetched rather than linked.
   media: async (id: string) => {
-    const response = await fetch(`/api/v1/media/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+    const response = await fetch(`/api/v1/media/${id}`, { headers: headers() });
     if (!response.ok) throw new ApiError("The image could not be loaded.", "error", response.status);
     return response.blob();
   },

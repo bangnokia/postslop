@@ -63,7 +63,7 @@ final readonly class XBrowserProcess
         $deadline = (hrtime(true) / 1e9) + $this->timeoutSeconds;
         $offset = 0;
         $output = '';
-        $errorBytes = 0;
+        $errors = '';
         $loop = EventLoop::current();
         while ((hrtime(true) / 1e9) < $deadline) {
             if (array_key_exists(0, $pipes)) {
@@ -80,14 +80,19 @@ final readonly class XBrowserProcess
                 }
             }
             $output .= $this->read($pipes[1]);
-            $errorBytes += strlen($this->read($pipes[2]));
-            if (strlen($output) > self::MAX_OUTPUT_BYTES || $errorBytes > self::MAX_OUTPUT_BYTES) {
+            $errors .= $this->read($pipes[2]);
+            if (strlen($output) > self::MAX_OUTPUT_BYTES || strlen($errors) > self::MAX_OUTPUT_BYTES) {
                 throw new \RuntimeException('The X browser worker exceeded its output limit.');
             }
             $state = proc_get_status($process);
             if (!$state['running'] && feof($pipes[1]) && feof($pipes[2])) {
                 if ($state['exitcode'] !== 0 || $offset !== strlen($payload)) {
-                    throw new \RuntimeException('The X browser worker exited without confirming its result.');
+                    throw new \RuntimeException(
+                        'The X browser worker exited with code '
+                        . $state['exitcode']
+                        . ' without confirming its result.'
+                        . self::errorLine($errors),
+                    );
                 }
                 return $output;
             }
@@ -95,6 +100,20 @@ final readonly class XBrowserProcess
             Async::sleep($loop, 0.01);
         }
         throw new \RuntimeException('The X browser worker did not finish before its deadline.');
+    }
+
+    /**
+     * The worker's last error line, such as a missing package, for the account's technical details. Only lines naming an
+     * error are kept, and long token-like values are removed, since raw browser output can contain cookies.
+     */
+    private static function errorLine(string $errors): string
+    {
+        if (preg_match_all('/^\s*(?:[A-Za-z]*Error\b.*|node:.*)$/m', $errors, $lines) < 1) {
+            return '';
+        }
+        $line = trim(end($lines[0]));
+        $line = (string) preg_replace('/[A-Za-z0-9%_\-]{24,}/', '…', $line);
+        return ' ' . mb_strimwidth($line, 0, 300, '…');
     }
 
     /** @param resource $pipe */

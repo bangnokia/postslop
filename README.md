@@ -4,14 +4,15 @@ Write once and publish text and images to **X, Bluesky and dev-null.sh** using t
 
 ```
  Raycast ──────┐
- AI / scripts ─┼─▶ bin/postslop (CLI) ─┐
- scheduler ────┘                       ▼
+ AI / scripts ─┴─▶ bin/postslop (CLI) ─┐
+                                       ▼
                                Core (server/app/Core) ── SQLite, sessions, images
                                        ▲
- web client ──▶ /api/v1 (HTTP) ────────┘
+ web client ──▶ /api/v1 (HTTP) ────────┤
+ schedule ──▶ queue (postslop serve) ──┘
 ```
 
-One core holds every rule: drafts, scheduling, history, and never posting the same thing twice. It has two front doors. The **command line** runs the core directly, so Raycast, AI agents and the scheduler need no server running. The **HTTP API** serves the web client.
+One core holds every rule: drafts, scheduling, history, and never posting the same thing twice. It has two front doors. The **command line** runs the core directly, so Raycast and AI agents need no server running. The **HTTP API** serves the web client.
 
 | Folder | What |
 | --- | --- |
@@ -28,7 +29,7 @@ Requires PHP 8.4+ with `fileinfo` and `gd`, Composer, Node 22+ and Python 3. Com
 cd server
 composer install
 cp -n .env.example .env        # only on a new checkout
-php scripts/setup.php          # private storage, local token, database
+php scripts/setup.php          # private storage, access token, database
 cd browser-worker && npm ci && npm run setup && cd ..   # X's private headless browser
 bin/postslop setup             # import your signed-in sessions from Chrome
 ```
@@ -45,8 +46,7 @@ postslop post "Hello" --at="tomorrow 9am"  # schedule (local time)
 postslop post "Look" --image=shot.png --to=x,bluesky --now
 postslop posts --status=scheduled          # history, newest first
 postslop show ID | publish ID | retry ID | schedule ID --at=… | delete ID
-postslop scheduler install                 # publish scheduled posts on time
-postslop serve                             # web client at http://127.0.0.1:8087
+postslop serve                             # web client, API, schedule and queue
 ```
 
 **A post is a draft unless you say `--now` or give a time.** So an AI agent can prepare posts safely, and nothing goes public without an explicit flag. `postslop help post` lists every option.
@@ -55,11 +55,11 @@ For scripts and agents, every command takes `--json` and prints exactly one JSON
 
 ### Scheduling
 
-`postslop scheduler install` adds a launchd job that runs `postslop run-due` once a minute. Nothing stays running in between. Scheduled posts then go out on time even with the web client and Raycast closed. `postslop scheduler status` checks the job, and `uninstall` removes it. Logs are in `server/storage/logs/scheduler.log`.
+`postslop serve` runs CrabPHP's schedule and queue beside the web server when `SERVER_SCHEDULE` and `SERVER_QUEUE` are on in `.env`; no OS cron or launchd job is involved. Every minute the schedule pushes a `PublishDuePosts` job onto the queue (the `jobs` table), and a queue worker publishes the posts that are due. A repeated or retried job is harmless because the core never publishes a post twice. `php cua schedule:list` shows the task and `php cua queue:failed` shows jobs that gave up. `postslop run-due` still publishes due posts by hand.
 
 ## Web client
 
-`postslop serve` (or `php cua serve --daemon` in `server/`) serves the built client at <http://127.0.0.1:8087>:
+`postslop serve` (or `php cua serve --daemon` in `server/`) serves the built client at `SERVER_ADDRESS` (<http://127.0.0.1:8087> by default) and asks for the access token once:
 
 - **Compose**: per-site character counters, paste, drop or pick images with descriptions, publish now or schedule, and save drafts. The unsent draft, images included, is kept in this browser.
 - **Posts**: the history, filtered by scheduled, drafts, needs attention or published. Each post shows its result on each site, with links.
@@ -96,7 +96,7 @@ Each post's ID is its request ID, with a fingerprint of its content. Before cont
 
 ## Private local data
 
-`server/storage/`, `.env`, dependencies, the built web client and compiled helpers stay out of Git. The database, images and sessions have private permissions, in folders only you can read. The HTTP API checks the host, the origin and a local bearer token, and never serves private storage. The web client reads the token from its page. Raycast uses the CLI and needs no token.
+`server/storage/`, `.env`, dependencies, the built web client and compiled helpers stay out of Git. The database, images and sessions have private permissions, in folders only you can read. Postslop can run on another machine and be reached from anywhere it listens (`SERVER_ADDRESS`). The HTTP API requires the access token in `server/storage/client-token` as a bearer token and never serves private storage. The web client asks for that token once and keeps it in the browser; you may replace the file's contents with your own password. Put HTTPS in front of it when it is reached over a network, since the token travels with every request. Raycast uses the CLI and needs no token.
 
 ## Checks
 

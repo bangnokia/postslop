@@ -1,6 +1,6 @@
 # Postslop conventions
 
-- Keep one core (`server/app/Core`) with two thin front doors: the CLI (`server/bin/postslop`, used by Raycast, AI agents and the scheduler, needing no server) and the HTTP API (`/api/v1`, used by the web client in `clients/web`). Put every rule in the core first, then expose it through both doors.
+- Keep one core (`server/app/Core`) with two thin front doors: the CLI (`server/bin/postslop`, used by Raycast and AI agents, needing no server) and the HTTP API (`/api/v1`, used by the web client in `clients/web`). Put every rule in the core first, then expose it through both doors.
 - Store posts, deliveries and images in SQLite through the core; never publish around it.
 - While in development, keep one migration file per table and edit it in place instead of adding migrations; `migrate:rollback` then `migrate` rebuilds the database.
 - A CLI post is a draft unless `--now` or a scheduled time is given explicitly, so AI agents never publish by default.
@@ -25,4 +25,6 @@
 - Prefer the smallest change that fixes a proven cause; avoid speculative code.
 - Use the session's native computer-use tool for desktop inspection; do not launch Orca unless explicitly requested.
 - Share clean destination URLs; remove all `utm_*` parameters and do not add campaign tracking parameters.
+- Publish scheduled posts through CrabPHP's own schedule and queue run by `serve`, never an OS crontab or launchd job.
+- Postslop may be installed on another machine: do not restrict the HTTP API to localhost; protect it with the access token (a password) in `server/storage/client-token`, entered once in the web client.
 - Record durable user conventions here when they are missing and follow them immediately.

@@ -12,7 +12,6 @@ use App\Console\PostRetry;
 use App\Console\PostRunDue;
 use App\Console\PostSchedule;
 use App\Console\PostShow;
-use App\Console\SchedulerInstall;
 use Crab\Command;
 
 // bin/postslop gives each of these a short name: postslop post, postslop posts, …
@@ -26,4 +25,3 @@ Command::add('post:retry', PostRetry::class);
 Command::add('post:schedule', PostSchedule::class);
 Command::add('post:delete', PostDelete::class);
 Command::add('post:run-due', PostRunDue::class);
-Command::add('scheduler:install', SchedulerInstall::class);

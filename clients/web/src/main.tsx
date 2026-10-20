@@ -1,4 +1,5 @@
-import { StrictMode } from "react";
+import { StrictMode, useState, type FormEvent } from "react";
+import { ApiError, signIn, storedToken } from "./api";
 import { createRoot } from "react-dom/client";
 import { AccountsPage } from "./pages/AccountsPage";
 import { Compose } from "./pages/Compose";
@@ -51,8 +52,46 @@ function App() {
   );
 }
 
+// Sign in with the access token from server/storage/client-token, checked against the API before it is kept.
+function SignIn() {
+  const [token, setToken] = useState("");
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(undefined);
+    try {
+      const response = await fetch("/api/v1/accounts", { headers: { Authorization: `Bearer ${token.trim()}`, Accept: "application/json" } });
+      if (response.status === 401) throw new ApiError("That access token is not right.", "unauthorized", 401);
+      if (!response.ok) throw new ApiError(`Postslop answered HTTP ${response.status}.`, "error", response.status);
+      signIn(token.trim());
+      window.location.reload();
+    } catch (failure) {
+      setError(failure instanceof ApiError ? failure.message : "Postslop is not reachable.");
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="workspace">
+      <main className="page sign-in">
+        <h1>Sign in to postslop<span className="brand-period">.</span></h1>
+        <form onSubmit={submit}>
+          <label htmlFor="token">Access token</label>
+          <input id="token" type="password" autoComplete="current-password" autoFocus required value={token} onChange={(event) => setToken(event.target.value)} />
+          <button className="publish-button" data-ready={token.trim() !== "" && !busy} disabled={token.trim() === "" || busy} type="submit">
+            Sign in
+          </button>
+        </form>
+        {error && <p className="sign-in-error">{error}</p>}
+        <p className="hint">It is in server/storage/client-token on the machine running Postslop.</p>
+      </main>
+    </div>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    {storedToken() ? <App /> : <SignIn />}
   </StrictMode>,
 );

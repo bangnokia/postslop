@@ -20,6 +20,12 @@ export function AccountsPage({ accounts }: { accounts: AccountState }) {
               <div>
                 <strong>{account?.label ?? id}</strong>
                 <span>{account ? (account.available ? `Signed in as @${account.handle}` : (account.reason ?? "Session unavailable.")) : "Checking…"}</span>
+                {account?.detail && (
+                  <details className="account-detail">
+                    <summary>Technical details</summary>
+                    <code>{account.detail}</code>
+                  </details>
+                )}
               </div>
               <span className="account-state">{account?.available ? "Ready" : account ? "Needs attention" : ""}</span>
             </li>

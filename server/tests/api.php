@@ -49,7 +49,12 @@ imagepng($image);
 $png = ob_get_clean();
 try {
     $guest->get('/api/v1/posts')->assertStatus(401);
-    new Api($app)->withHeaders(['Host' => 'evil.example'])->withToken($token)->get('/api/v1/posts')->assertStatus(403);
+    $guest->withToken('wrong-token-of-enough-length')->get('/api/v1/posts')->assertStatus(401);
+    // Postslop may run on another machine, so other hosts are let in with the token.
+    new Api($app)->withHeaders(['Host' => 'postslop.example:8087', 'Origin' => 'http://postslop.example:8087'])
+        ->withToken($token)
+        ->get('/api/v1/posts')
+        ->assertStatus(200);
     $api->get('/api/v1/accounts')->assertStatus(200)->assertJson('platforms.0.handle', 'fixture');
 
     $draft = $api->post('/api/v1/posts', [
@@ -88,7 +93,7 @@ try {
 
     $now = $api->post('/api/v1/posts', ['text' => 'now', 'platforms' => ['bluesky']])->assertStatus(200)->json();
     api_check($now['status'] === 'published' && $publisher->calls === 2, 'Publishing now did not send');
-    echo "API checks passed: token and host checks, drafts, images, edits, scheduling, publishing, history, deletion, and error codes.\n";
+    echo "API checks passed: token checks, drafts, images, edits, scheduling, publishing, history, deletion, and error codes.\n";
 } finally {
     test_remove($directory);
 }

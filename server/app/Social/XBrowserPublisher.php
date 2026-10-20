@@ -30,18 +30,27 @@ final readonly class XBrowserPublisher implements Publisher
             $input = $this->input('status');
             $result = $this->worker->request($input);
             if (($result['id'] ?? null) !== 'x' || !is_bool($result['available'] ?? null)) {
-                return [...$status, 'reason' => $this->reason('unavailable')];
+                return [
+                    ...$status,
+                    'reason' => $this->reason('unavailable'),
+                    'detail' => 'The X browser worker answered without the account status.',
+                ];
             }
             if (!$result['available']) {
-                return [...$status, 'reason' => $this->reason($result['code'] ?? null)];
+                $code = is_string($result['code'] ?? null) ? $result['code'] : 'none';
+                return [...$status, 'reason' => $this->reason($code), 'detail' => $this->workerDetail($code, $result)];
             }
             $handle = $result['handle'] ?? null;
             if (!is_string($handle) || strcasecmp(ltrim($handle, '@'), $input['expectedHandle']) !== 0) {
-                return [...$status, 'reason' => $this->reason('account_mismatch')];
+                return [
+                    ...$status,
+                    'reason' => $this->reason('account_mismatch'),
+                    'detail' => 'Signed in as @' . ltrim((string) $handle, '@') . ', expected @' . $input['expectedHandle'] . '.',
+                ];
             }
             return [...$status, 'available' => true, 'handle' => '@' . $input['expectedHandle']];
-        } catch (\RuntimeException|\JsonException) {
-            return [...$status, 'reason' => $this->reason('unavailable')];
+        } catch (\RuntimeException|\JsonException $error) {
+            return [...$status, 'reason' => $this->reason('unavailable'), 'detail' => $error->getMessage()];
         }
     }
 
@@ -149,6 +158,23 @@ final readonly class XBrowserPublisher implements Publisher
                 => 'X rejected this request with its posting-limit error (code 344). Keep the draft and try later.',
             default => 'Postslop could not verify its background X session. Check the connection or import the session again.',
         };
+    }
+
+    /**
+     * The worker's code, its own message (the worker only reports messages it wrote) and the stage it stopped at.
+     */
+    private function workerDetail(string $code, array $result): string
+    {
+        $detail = 'The X browser worker reported code "' . $code . '"';
+        if (is_string($result['reason'] ?? null)) {
+            $detail .= ': ' . $result['reason'];
+        }
+        $path = $this->profilePath . '/last-error.json';
+        $last = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+        if (is_array($last) && is_string($last['stage'] ?? null)) {
+            $detail .= ' (stage: ' . $last['stage'] . ', error: ' . ($last['errorName'] ?? 'Error') . ')';
+        }
+        return $detail;
     }
 
     private function unknown(): array

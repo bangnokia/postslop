@@ -81,7 +81,9 @@ textarea:focus-visible { border-radius: 2px; outline: 2px solid #e9693440; outli
 .x-icon { font-size: 1.4375rem; color: #262626; }
 .bluesky-icon { color: #2085e9; }
 .bluesky-icon svg { display: block; width: 25px; height: 25px; }
-.terminal-icon { font: 700 1rem var(--mono); letter-spacing: -2px; color: #767565; background: #efeee6; }
+.dev-null-icon svg { display: block; width: 24px; height: 24px; }
+.dev-null-icon .ink { fill: #121417; }
+.dev-null-icon .accent { fill: #d9480f; }
 .network-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 0.875rem; font-weight: 600; }
 .network-name > span { overflow: hidden; color: var(--faint); font-size: 0.75rem; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .network-name > span[data-error="true"] { color: var(--red); }
@@ -173,6 +175,9 @@ input:checked ~ .checkbox-mark::after { content: ""; width: 7px; height: 4px; ma
 .account-list li > div span { font-family: var(--mono); color: var(--muted); font-size: 0.875rem; }
 .account-state { color: var(--amber); font-size: 0.8125rem; font-weight: 650; }
 .account-list li[data-ready="true"] .account-state { color: var(--green); }
+.account-detail { margin-top: 6px; font-size: 0.8125rem; color: var(--muted); }
+.account-detail summary { cursor: pointer; }
+.account-detail code { display: block; margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: var(--panel); font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .setup-note { padding: 20px 22px; border: 1px dashed #d6cfc3; border-radius: 10px; color: #5f5a51; font-size: 0.9375rem; line-height: 1.6; }
 .setup-note h2 { margin: 0 0 6px; font-size: 1rem; }
 .setup-note pre { margin: 10px 0; padding: 12px 14px; border-radius: 7px; background: var(--ink); color: var(--paper); }
@@ -198,3 +203,12 @@ input:checked ~ .checkbox-mark::after { content: ""; width: 7px; height: 4px; ma
   .page-heading { flex-wrap: wrap; }
   .workspace-footer { flex-direction: column; align-items: flex-start; }
 }
+
+/* Sign in */
+.sign-in { max-width: 420px; padding-top: 18vh; }
+.sign-in h1 { margin: 0 0 24px; font-size: 2.125rem; letter-spacing: -1.6px; font-weight: 650; }
+.sign-in form { display: grid; gap: 10px; margin-bottom: 14px; }
+.sign-in label { font-size: 0.75rem; font-weight: 650; text-transform: uppercase; letter-spacing: 1.7px; }
+.sign-in input { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); font: 0.9375rem var(--mono); }
+.sign-in .publish-button { justify-content: center; }
+.sign-in-error { margin: 0 0 10px; color: var(--red); font-size: 0.875rem; }

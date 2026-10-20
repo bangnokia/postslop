@@ -2,7 +2,7 @@
 
 The web client talks to the core through this API. The command line (`bin/postslop`) runs the same core directly; both follow the same rules.
 
-Base URL: `http://127.0.0.1:8087`. Every `/api/` request requires `Authorization: Bearer <contents of server/storage/client-token>`. The token stays local and must not appear in examples, logs or shared files. Requests must come from the local host; `POST` and `PUT` bodies must be `Content-Type: application/json`. Responses are not cached.
+Base URL: `http://127.0.0.1:8087`. Every `/api/` request requires `Authorization: Bearer <contents of server/storage/client-token>`, from any host. The token is private and must not appear in examples, logs or shared files. `POST` and `PUT` bodies must be `Content-Type: application/json`. Responses are not cached.
 
 ## Posts and their lifecycle
 
@@ -57,7 +57,7 @@ Read-only sign-in checks, cached for 30 seconds; `?refresh=1` checks again. Blue
 }
 ```
 
-Handles have no leading `@`. A platform can be unavailable even when session data exists; show `reason` and let the user pick other destinations. `textLimit` is for counters; each publisher enforces its site's exact rule.
+Handles have no leading `@`. A platform can be unavailable even when session data exists; show `reason` and let the user pick other destinations. An optional `detail` holds technical information for diagnosing it, such as the background browser's own error, with secrets removed. `textLimit` is for counters; each publisher enforces its site's exact rule.
 
 ## Write a post — `POST /api/v1/posts`
 
@@ -105,8 +105,7 @@ Sends again to the destinations that `failed`, with the stored text and images, 
 
 | Status | Code | Meaning |
 | --- | --- | --- |
-| 401 | | Missing or invalid local token |
-| 403 | | Not the local host, or a cross-site request |
+| 401 | | Missing or invalid access token |
 | 404 | `not_found` | Unknown post, image or route |
 | 409 | `busy` | Another post is publishing; try again shortly |
 | 409 | `conflict` | The request ID belongs to other content, or the post was already sent |

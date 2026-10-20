@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, PLATFORM_NAMES, PLATFORMS, type NewImage, type Platform, type Post, type PostInput } from "../api";
-import { blankDraft, length, loadDraft, prepareImage, saveDraft, toIso, toLocalInput, when, type LocalDraft } from "../compose";
+import { blankDraft, length, loadDraft, prepareImage, saveDraft, toIso, toLocalInput, uuid, when, type LocalDraft } from "../compose";
 import { go, PlatformIcon, Results, type AccountState } from "../ui";
 
 type Mode = "now" | "schedule";
@@ -59,7 +59,7 @@ export function Compose({ editing, accounts }: { editing?: string; accounts: Acc
   function edit(change: Partial<LocalDraft>) {
     if (!draft) return;
     // Any change makes a new post: a request ID is reused only to repeat the same one.
-    const next = { ...draft, ...change, requestId: draft.postId ?? (sent ? crypto.randomUUID() : draft.requestId) };
+    const next = { ...draft, ...change, requestId: draft.postId ?? (sent ? uuid() : draft.requestId) };
     setSent(undefined);
     setDraft(next);
     if (!next.postId) saveDraft(next).catch(() => setNotice({ text: "Draft storage is unavailable. Keep this tab open.", error: true }));
