@@ -10,7 +10,7 @@ npm ci
 npm run setup
 ```
 
-The `status` operation imports valid X-only cookies from `storage/sessions/x.json` when source authentication changes, loads X, and verifies the actual Profile link matches `expectedHandle`. It never posts. The `publish` operation additionally requires a UUID `requestId`, text, and up to four PNG/JPEG/WebP images of at most 1 MiB each. Images contain `filename`, `mimeType`, base64 `data`, and optional `alt`.
+The `status` operation imports the valid X-only cookies that Postslop sends with each request, from `storage/sessions.json`, when their authentication changes, loads X, and verifies the actual Profile link matches `expectedHandle`. It never posts. The `publish` operation additionally requires a UUID `requestId`, text, and up to four PNG/JPEG/WebP images of at most 1 MiB each. Images contain `filename`, `mimeType`, base64 `data`, and optional `alt`.
 
 For local diagnosis only, a publish request with `prepareOnly: true` prepares the composer and returns `prepared` without clicking Post or creating a submission journal. A network guard also blocks CreateTweet POST requests during preparation. Its private screenshot is `storage/browser/x/last-prepared.png`. Failures record only a fixed phase, error name, safe code, numeric control counts, and screenshot availability in `last-error.json`; a fresh pre-submit screenshot is captured when possible. The worker never saves raw exception messages, headers, or session values in these diagnostics.
 

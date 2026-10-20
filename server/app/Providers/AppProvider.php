@@ -30,7 +30,7 @@ final class AppProvider implements Provider
         );
         $container->singleton(
             SessionStore::class,
-            static fn(): SessionStore => new SessionStore(config('postslop.sessions_path')),
+            static fn(): SessionStore => new SessionStore(config('postslop.sessions_file')),
         );
         $container->singleton(Publishing::class, static function (Container $container): Publishing {
             $http = $container->get(Client::class);
@@ -40,7 +40,6 @@ final class AppProvider implements Provider
                     $sessions,
                     config('postslop.node_binary'),
                     config('postslop.x_browser_worker'),
-                    config('postslop.sessions_path') . '/x.json',
                     config('postslop.x_browser_profile'),
                     baseUrl: config('postslop.x_url'),
                 ),

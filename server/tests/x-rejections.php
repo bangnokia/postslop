@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use App\PrivateFiles;
 use App\Social\SessionStore;
 use App\Social\XPublisher;
 use Crab\App;
@@ -26,16 +25,15 @@ new App(new Config(['postslop' => [
 ]]));
 
 $directory = sys_get_temp_dir() . '/postslop-x-rejections-' . bin2hex(random_bytes(6));
-$sessions = new SessionStore($directory);
-$sessions->write('x', [
+$sessions = new SessionStore($directory . '/sessions.json');
+$sessions->import(['x' => ['handle' => 'tester', 'session' => [
     'cookies' => [
         ['name' => 'auth_token', 'value' => 'fixture-auth', 'domain' => '.x.com', 'expires' => time() + 3600],
         ['name' => 'ct0', 'value' => 'fixture-csrf', 'domain' => '.x.com', 'expires' => -1],
         ['name' => '__cf_bm', 'value' => 'expired-fixture-cookie', 'domain' => '.x.com', 'expires' => time() - 3600],
     ],
     'origins' => [],
-]);
-PrivateFiles::json($directory . '/manifest.json', ['accounts' => ['x' => ['handle' => '@tester']]]);
+]]], 'test');
 
 // These are the same observed website-response shapes and synthetic identity as tests/fakes/x.cjs.
 $state = [
@@ -101,7 +99,6 @@ try {
     echo
         "X rejection checks passed: 344/226 diagnostics, credential redaction, expired cookies, public assets, and uncertain 5xx without retries.\n";
 } finally {
-    unlink($directory . '/x.json');
-    unlink($directory . '/manifest.json');
+    array_map(unlink(...), glob($directory . '/*') ?: []);
     rmdir($directory);
 }

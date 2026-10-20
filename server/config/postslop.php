@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'sessions_path' => env('POSTSLOP_SESSIONS_PATH', dirname(__DIR__) . '/storage/sessions'),
+    'sessions_file' => env('POSTSLOP_SESSIONS_FILE', dirname(__DIR__) . '/storage/sessions.json'),
     'posts_path' => env('POSTSLOP_POSTS_PATH', dirname(__DIR__) . '/storage/posts'),
     'media_path' => env('POSTSLOP_MEDIA_PATH', dirname(__DIR__) . '/storage/media'),
     'token_path' => env('POSTSLOP_TOKEN_PATH', dirname(__DIR__) . '/storage/client-token'),

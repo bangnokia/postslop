@@ -18,14 +18,13 @@ async function withFixture(options, callback) {
   const fixture = xFixture(options);
   const server = createServer(fixture.handler);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const sessionPath = join(directory, 'x.json');
-  await writeFile(sessionPath, JSON.stringify({ cookies: ['auth_token', 'ct0'].map((name) => ({
+  const session = { cookies: ['auth_token', 'ct0'].map((name) => ({
     name, value: 'fixture-only', domain: '.x.com', path: '/', expires: -1, secure: true, httpOnly: true, sameSite: 'Lax',
-  })) }), { mode: 0o600 });
+  })) };
   const input = {
     operation: 'publish', requestId: randomUUID(), text: 'A fixture post\nwith a second line',
     images: [{ filename: 'clipboard.png', mimeType: 'image/png', data: imageBytes.toString('base64'), alt: 'A white pixel' }],
-    sessionPath, profilePath: join(directory, 'profile'), expectedHandle: 'bangnokia',
+    session, profilePath: join(directory, 'profile'), expectedHandle: 'bangnokia',
     baseUrl: `http://127.0.0.1:${server.address().port}${options.prefix ?? ''}`,
   };
   try { await callback(input, fixture); }

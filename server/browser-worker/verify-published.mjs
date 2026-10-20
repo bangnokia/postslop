@@ -8,7 +8,7 @@ process.umask(0o077);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const input = {
   expectedHandle: 'bangnokia', baseUrl: 'https://x.com',
-  sessionPath: join(root, 'storage/sessions/x.json'),
+  session: JSON.parse(await readFile(join(root, 'storage/sessions.json'), 'utf8')).accounts.x.session,
   profilePath: join(root, 'storage/browser/x'),
 };
 const url = process.argv[2];

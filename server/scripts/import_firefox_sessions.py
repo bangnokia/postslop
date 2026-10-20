@@ -2,15 +2,14 @@
 """Import only Postslop's three sites from an explicitly selected Firefox profile.
 
 No network requests or browser changes are made. Verify the signed-in identities in
-Firefox before supplying their handles. Output contains credentials and stays in
-the project's ignored storage/sessions directory; stdout contains metadata only.
+Firefox before supplying their handles. The sessions are written to stdout for
+`postslop setup`, which saves them; it refuses to print them to a terminal.
 """
 
 from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
-from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -20,7 +19,6 @@ import tempfile
 import time
 
 
-SESSION_DIRECTORY = Path(__file__).resolve().parents[1] / "storage" / "sessions"
 DOMAINS = {"x": "x.com", "bluesky": "bsky.app", "dev-null": "dev-null.sh"}
 MAX_DATABASE_BYTES = 128 * 1024 * 1024
 MAX_LOCAL_STORAGE_BYTES = 8 * 1024 * 1024
@@ -243,19 +241,13 @@ def bluesky_storage(value: str, expected_handle: str) -> list[dict]:
     return [{"name": "BSKY_STORAGE", "value": json.dumps(state, ensure_ascii=True, separators=(",", ":"))}]
 
 
-def atomic_json(path: Path, value) -> None:
-    descriptor, temporary = tempfile.mkstemp(prefix=".import-", suffix=".json", dir=path.parent)
-    try:
-        os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
-            json.dump(value, output, ensure_ascii=True, separators=(",", ":"))
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+def report(source: str, profile: Path, states: dict, accounts: dict) -> None:
+    """Hand the sessions to `postslop setup` through a pipe; never show them on a terminal."""
+    if sys.stdout.isatty():
+        raise ImportFailure("Run this through `postslop setup`, which saves the sessions privately.")
+    print(json.dumps({"source": source, "profile": str(profile), "accounts": {
+        platform: {**account, "session": states[platform]} for platform, account in accounts.items()
+    }}))
 
 
 def main() -> int:
@@ -264,7 +256,6 @@ def main() -> int:
     parser.add_argument("--x-handle", required=True, help="X handle already verified in Firefox")
     parser.add_argument("--bluesky-handle", required=True, help="Bluesky handle already verified in Firefox")
     parser.add_argument("--dev-null-handle", required=True, help="dev-null.sh handle already verified in Firefox")
-    parser.add_argument("--check-only", action="store_true", help="Validate capture; print metadata without exporting")
     arguments = parser.parse_args()
     handles = {
         "x": arguments.x_handle.lstrip("@"), "bluesky": arguments.bluesky_handle.lstrip("@"),
@@ -281,7 +272,7 @@ def main() -> int:
             states[platform] = {"cookies": cookies, "origins": []}
             accounts[platform] = {
                 "handle": handles[platform], "cookieCount": len(cookies), "skippedCookies": skipped,
-                "localStorageCount": 0, "file": platform + ".json", "importedSessionVerified": False,
+                "localStorageCount": 0,
             }
     if not {"auth_token", "ct0"}.issubset({cookie["name"] for cookie in states["x"]["cookies"]}):
         raise ImportFailure("The selected Firefox profile has no usable persisted X sign-in.")
@@ -290,19 +281,7 @@ def main() -> int:
     local_storage = read_bluesky_storage(arguments.profile, handles["bluesky"])
     states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]
     accounts["bluesky"]["localStorageCount"] = len(local_storage)
-    manifest = {
-        "importedAt": datetime.now(timezone.utc).isoformat(), "source": "firefox",
-        "accounts": accounts, "note": "Source account handles were supplied after browser verification; imported session replay is not yet verified.",
-    }
-    if not arguments.check_only:
-        if SESSION_DIRECTORY.is_symlink():
-            raise ImportFailure("Session directory must not be a symbolic link.")
-        SESSION_DIRECTORY.mkdir(mode=0o700, parents=True, exist_ok=True)
-        os.chmod(SESSION_DIRECTORY, 0o700)
-        for platform, state in states.items():
-            atomic_json(SESSION_DIRECTORY / (platform + ".json"), state)
-        atomic_json(SESSION_DIRECTORY / "manifest.json", manifest)
-    print(json.dumps({"exported": not arguments.check_only, **manifest}, indent=2))
+    report("firefox", arguments.profile, states, accounts)
     return 0
 
 
@@ -314,5 +293,5 @@ if __name__ == "__main__":
         raise SystemExit(1)
     except (OSError, sqlite3.Error):
         # Do not emit exception payloads, which could include paths or row data.
-        print("Import failed: unable to read Firefox data or write private session files.", file=sys.stderr)
+        print("Import failed: unable to read Firefox data.", file=sys.stderr)
         raise SystemExit(1)

@@ -9,7 +9,6 @@ use Crab\Contracts\Database\Migrator;
 
 $storage = dirname(__DIR__) . '/storage';
 PrivateFiles::directory($storage);
-PrivateFiles::directory($storage . '/sessions');
 PrivateFiles::directory($storage . '/posts');
 PrivateFiles::directory($storage . '/media');
 PrivateFiles::directory($storage . '/browser');

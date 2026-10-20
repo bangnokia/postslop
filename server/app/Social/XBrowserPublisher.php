@@ -16,7 +16,6 @@ final readonly class XBrowserPublisher implements Publisher
         private SessionStore $sessions,
         string $nodeBinary,
         string $workerPath,
-        private string $sessionPath,
         private string $profilePath,
         float $timeoutSeconds = 95,
         private string $baseUrl = 'https://x.com',
@@ -116,12 +115,12 @@ final readonly class XBrowserPublisher implements Publisher
     private function input(string $operation): array
     {
         $handle = ltrim($this->sessions->expectedHandle('x') ?? '', '@');
-        if (preg_match('/^[a-zA-Z0-9_]{1,15}$/D', $handle) !== 1 || !is_file($this->sessionPath)) {
+        if (preg_match('/^[a-zA-Z0-9_]{1,15}$/D', $handle) !== 1) {
             throw new \RuntimeException('The intended X account and imported session are required.');
         }
         return [
             'operation' => $operation,
-            'sessionPath' => $this->sessionPath,
+            'session' => $this->sessions->read('x'),
             'profilePath' => $this->profilePath,
             'expectedHandle' => $handle,
             'baseUrl' => $this->baseUrl,

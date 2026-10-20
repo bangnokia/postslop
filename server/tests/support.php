@@ -21,7 +21,7 @@ function test_app(string $directory): App
     putenv('CACHE_STORE=array');
     putenv('POSTSLOP_POSTS_PATH=' . $directory . '/posts');
     putenv('POSTSLOP_MEDIA_PATH=' . $directory . '/media');
-    putenv('POSTSLOP_SESSIONS_PATH=' . $directory . '/sessions');
+    putenv('POSTSLOP_SESSIONS_FILE=' . $directory . '/sessions.json');
     $app = require dirname(__DIR__) . '/app.php';
     $app->container->get(Migrator::class)->run();
     return $app;

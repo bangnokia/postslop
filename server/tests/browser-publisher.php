@@ -23,9 +23,8 @@ $configuredNode = getenv('POSTSLOP_NODE_BINARY');
 $node = $configuredNode === false || $configuredNode === '' ? '/opt/homebrew/bin/node' : $configuredNode;
 browser_check(is_executable($node), 'Set POSTSLOP_NODE_BINARY to the installed Node executable.');
 $directory = sys_get_temp_dir() . '/postslop-browser-' . bin2hex(random_bytes(6));
-$sessions = new SessionStore($directory);
-$sessions->write('x', ['cookies' => []]);
-PrivateFiles::json($directory . '/manifest.json', ['accounts' => ['x' => ['handle' => '@tester']]]);
+$sessions = new SessionStore($directory . '/sessions.json');
+$sessions->import(['x' => ['handle' => 'tester', 'session' => ['cookies' => []]]], 'test');
 $workerPath = $directory . '/fixture worker.mjs';
 file_put_contents($workerPath, <<<'JS'
     import { readFileSync, writeFileSync } from 'node:fs';
@@ -37,7 +36,7 @@ file_put_contents($workerPath, <<<'JS'
     writeFileSync(new URL('./received.json', import.meta.url), JSON.stringify({
       operation: input.operation,
       expectedHandle: input.expectedHandle,
-      sessionPath: input.sessionPath,
+      session: input.session,
       profilePath: input.profilePath,
       baseUrl: input.baseUrl,
       text: input.text,
@@ -66,7 +65,6 @@ $publisher = new XBrowserPublisher(
     $sessions,
     $node,
     $workerPath,
-    $directory . '/x.json',
     $directory . '/profile',
     timeoutSeconds: 3,
     baseUrl: 'http://127.0.0.1:12345/x',
@@ -86,7 +84,7 @@ try {
     browser_check(
         $received['operation'] === 'status'
         && $received['expectedHandle'] === 'tester'
-        && $received['sessionPath'] === $directory . '/x.json'
+        && $received['session'] === ['cookies' => []]
         && $received['profilePath'] === $directory . '/profile'
         && $received['baseUrl'] === 'http://127.0.0.1:12345/x',
         'The worker did not receive its isolated session/profile configuration.',
@@ -190,7 +188,6 @@ try {
         $sessions,
         $node,
         $workerPath,
-        $directory . '/x.json',
         $directory . '/profile',
         timeoutSeconds: 0.25,
     );
@@ -225,7 +222,6 @@ try {
         $sessions,
         $directory . '/missing-node',
         $workerPath,
-        $directory . '/x.json',
         $directory . '/profile',
     );
     browser_check($missingNode->status()['available'] === false, 'A missing runtime was marked available.');
@@ -234,7 +230,7 @@ try {
         'An abnormal process start was treated as a confirmed outcome.',
     );
 
-    unlink($directory . '/x.json');
+    PrivateFiles::json($directory . '/sessions.json', ['accounts' => ['x' => ['handle' => 'tester']]]);
     browser_check($publisher->status()['available'] === false, 'A missing session was marked connected.');
     browser_check(
         $publisher->publish($requestId, 'fixture', [])['status'] === 'failed',

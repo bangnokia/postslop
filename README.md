@@ -81,15 +81,14 @@ The **Postslop** extension composes inside Raycast. It runs the CLI, so it needs
 
 ## Browser sessions
 
-`postslop setup` reads Chrome's last used profile, asks which account is signed in on each site, and imports only those three sites' sessions into `server/storage/sessions/`. Check the accounts in the browser first. Postslop refuses a session that belongs to another account than the handle you give. Chrome encrypts its cookies, so macOS asks once to let Postslop use "Chrome Safe Storage": choose Allow. `--browser=firefox` imports from Firefox's default profile instead, `--profile=DIR` picks another profile, and `--check-only` reads without saving.
+`postslop setup` reads Chrome's last used profile, asks which account is signed in on each site, and saves only those three sites' sessions in one file, `server/storage/sessions.json`. Check the accounts in the browser first. Postslop refuses a session that belongs to another account than the handle you give. Chrome encrypts its cookies, so macOS asks once to let Postslop use "Chrome Safe Storage": choose Allow. `--browser=firefox` imports from Firefox's default profile instead, `--profile=DIR` picks another profile, and `--check-only` reads without saving.
 
 Under the hood, `scripts/import_chrome_sessions.py` and `scripts/import_firefox_sessions.py` read the browser's files without closing it or changing anything, and make no network requests. They skip partitioned and container cookies and X's multiple-account cookie, and keep only the active Bluesky account. Chrome's Bluesky session is read from its localStorage LevelDB files.
 
-X runs in the app-owned headless browser, which checks the signed-in profile before posting. dev-null.sh uses cookies and CSRF headers through Crab's HTTP client. Bluesky keeps its session tokens from localStorage and refreshes them when needed. Sessions expire and sites change: an unavailable account shows a reason, so import it again when needed.
+X runs in the app-owned headless browser. Postslop hands it the X cookies from `sessions.json` with each request; it loads them into its own profile in `server/storage/browser/x/` and checks the signed-in account before posting. dev-null.sh uses cookies and CSRF headers through Crab's HTTP client. Bluesky keeps its session tokens from localStorage and refreshes them when needed. Sessions expire and sites change: an unavailable account shows a reason, so import it again when needed.
 
 X can accept a session for account checks while rejecting a post. Error 226 is an explicit automation rejection. Error 344 is reported as an action limit, and is not by itself proof that a daily quota ran out. Postslop keeps the draft and the failed result, and never retries automatically. The former HTTP-only X adapter remains available with `POSTSLOP_X_TRANSPORT=http` for diagnostics; it is never an automatic fallback.
 
-For a separately verified Chrome session, `scripts/import_chrome_x.py --profile '/absolute/path/to/Chrome/Default' --expected-handle YOUR_X_HANDLE` writes only a private `storage/sessions/x-chrome.json` candidate, to check against the intended account before it replaces the active session.
 
 ## Never twice
 

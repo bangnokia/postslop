@@ -64,13 +64,12 @@ function validateInput(input) {
   if (input.prepareOnly !== undefined && typeof input.prepareOnly !== 'boolean') {
     throw new WorkerError('The X preparation option must be a boolean.');
   }
-  if (!isAbsolute(input.sessionPath ?? '') || !isAbsolute(input.profilePath ?? '')) {
-    throw new WorkerError('The X worker requires absolute private session and profile paths.');
+  if (!isAbsolute(input.profilePath ?? '')) {
+    throw new WorkerError('The X worker requires an absolute private profile path.');
   }
   const testing = process.env.POSTSLOP_TEST_MODE === '1';
-  if (!testing && (resolve(input.profilePath) !== join(appRoot, 'storage/browser/x')
-    || resolve(input.sessionPath) !== join(appRoot, 'storage/sessions/x.json'))) {
-    throw new WorkerError('The X worker only uses Postslop’s private X session and browser profile.');
+  if (!testing && resolve(input.profilePath) !== join(appRoot, 'storage/browser/x')) {
+    throw new WorkerError('The X worker only uses Postslop’s private X browser profile.');
   }
   if (!/^[A-Za-z0-9_]{1,15}$/.test(input.expectedHandle ?? '')) {
     throw new WorkerError('The expected X account is missing.');
@@ -117,7 +116,8 @@ function validateInput(input) {
 }
 
 async function importSession(context, input) {
-  const state = await readJson(input.sessionPath);
+  // Postslop sends the X session with each request; the worker never reads Postslop's session file.
+  const state = input.session;
   if (!Array.isArray(state?.cookies)) throw new WorkerError('Import your signed-in X session into Postslop first.', 'session_missing');
   const cookies = state.cookies.filter((cookie) => cookie && ['x.com', '.x.com'].includes(cookie.domain)
     && typeof cookie.name === 'string' && typeof cookie.value === 'string'

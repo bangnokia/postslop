@@ -18,7 +18,7 @@
 - Keep the Raycast UI responsive: hand publishing to a background command, close the composer after handoff, and show brief completion HUD/toast feedback instead of requiring users to wait in Raycast.
 - Use the working native Raycast form with an attachment list below the textarea; image previews are not required in Raycast. Keep image thumbnails in the web composer.
 - Always open Raycast Postslop on a fresh New Post form by default; preserve earlier drafts and results in Saved Posts, including posts still publishing in the background.
-- Keep session values private, local, and uncommitted; store imported sessions only under `server/storage/sessions/` with restricted permissions.
+- Keep session values private, local, and uncommitted; store every account's handle and session in the one file `server/storage/sessions.json`, readable only by the user; the X background browser receives its cookies from Postslop and keeps only its profile folder.
 - Never commit or push keys, credentials, tokens, session data, or other secrets; audit staged files before committing and pushing.
 - Verify that credentials match the intended account and that sign-in succeeds before sharing credentials or submitting them for review.
 - Never write or run tests for database seeders.

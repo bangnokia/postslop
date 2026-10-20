@@ -6,6 +6,7 @@ namespace App\Console;
 
 use App\Core\Failure;
 use App\Core\Publishing;
+use App\Social\SessionStore;
 use Crab\Contracts\Console\Input;
 use Crab\Contracts\Console\Output;
 
@@ -17,6 +18,7 @@ final readonly class AccountSetup extends CliCommand
 
     public function __construct(
         private Publishing $publishing,
+        private SessionStore $sessions,
     ) {}
 
     public function description(): string
@@ -33,7 +35,7 @@ final readonly class AccountSetup extends CliCommand
                              The account signed in on each site; asked for when left out
               --profile=DIR  The profile folder (default: the browser's last used or default profile)
               --check-only   Read the sessions without saving them
-            Nothing leaves this Mac. Sessions are stored in storage/sessions with private permissions.
+            Nothing leaves this Mac. Sessions are saved in storage/sessions.json, readable only by you.
             TEXT;
     }
 
@@ -69,9 +71,6 @@ final readonly class AccountSetup extends CliCommand
             '--dev-null-handle',
             $handles['dev-null'],
         ];
-        if ($input->flag('check-only')) {
-            $command[] = '--check-only';
-        }
         $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         if (!is_resource($process)) {
             throw Failure::invalid('Could not run python3. Install Python 3 and try again.');
@@ -84,6 +83,9 @@ final readonly class AccountSetup extends CliCommand
             throw Failure::invalid($stderr !== '' ? $stderr : 'The session import failed.');
         }
         $report = json_decode($stdout, true);
+        if (!is_array($report['accounts'] ?? null)) {
+            throw Failure::invalid('The session import returned nothing usable.');
+        }
         $output->line('Profile: ' . ($report['profile'] ?? $profile));
         foreach (self::SITES as $site => $label) {
             $account = $report['accounts'][$site] ?? [];
@@ -93,6 +95,7 @@ final readonly class AccountSetup extends CliCommand
             $output->line('Checked only; nothing was saved.');
             return self::OK;
         }
+        $this->sessions->import($report['accounts'], $browser);
         $output->line('Checking each session signs in as the account you named…');
         $ready = true;
         foreach ($this->publishing->refreshAccounts()['platforms'] as $account) {

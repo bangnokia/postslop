@@ -12,7 +12,7 @@ const storage = `${server}/storage`;
 export const fixtureEnv = {
   DB_DSN: `sqlite:${storage}/test-raycast-database.sqlite`,
   CACHE_STORE: "array",
-  POSTSLOP_SESSIONS_PATH: `${storage}/test-sessions`,
+  POSTSLOP_SESSIONS_FILE: `${storage}/test-sessions.json`,
   POSTSLOP_POSTS_PATH: `${storage}/test-raycast-posts`,
   POSTSLOP_MEDIA_PATH: `${storage}/test-raycast-media`,
   POSTSLOP_X_TRANSPORT: "http",

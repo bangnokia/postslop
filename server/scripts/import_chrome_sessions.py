@@ -3,26 +3,118 @@
 
 No network requests or browser changes are made. Decrypting cookies asks macOS for
 Chrome Safe Storage once. Verify the signed-in identities in Chrome before supplying
-their handles. Output contains credentials and stays in the project's ignored
-storage/sessions directory; stdout contains metadata only.
+their handles. The sessions are written to stdout for `postslop setup`, which saves
+them; it refuses to print them to a terminal.
 """
 
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+import ctypes
+import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
 import sqlite3
 import subprocess
 import sys
+import time
 
-from import_chrome_x import chrome_key, read_cookies, require_x_sign_in
 from import_firefox_sessions import (
-    DOMAINS, MAX_LOCAL_STORAGE_BYTES, SESSION_DIRECTORY, ImportFailure, atomic_json, bluesky_storage,
-    database_snapshot, decode_snappy,
+    DOMAINS, MAX_LOCAL_STORAGE_BYTES, ImportFailure, bluesky_storage, database_snapshot, decode_snappy, report,
 )
+
+
+CHROME_EPOCH_OFFSET = 11644473600
+
+
+def chrome_key() -> bytes:
+    try:
+        result = subprocess.run(
+            ["/usr/bin/security", "find-generic-password", "-w", "-s", "Chrome Safe Storage"],
+            capture_output=True, timeout=30, check=False,
+        )
+    except subprocess.TimeoutExpired:
+        raise ImportFailure("Chrome Safe Storage access timed out; check the macOS Keychain prompt and retry.") from None
+    password = result.stdout.removesuffix(b"\n")
+    if result.returncode or not password:
+        raise ImportFailure("Chrome Safe Storage was unavailable or access was denied.")
+    # Chromium's v10 macOS derivation (not the Linux fallback password):
+    # https://chromium.googlesource.com/chromium/src/+/ec82d4ab8/components/os_crypt/os_crypt_mac.mm
+    return hashlib.pbkdf2_hmac("sha1", password, b"saltysalt", 1003, dklen=16)
+
+
+def decrypt_cookie(encrypted: bytes, host: str, key: bytes) -> str:
+    if not encrypted.startswith(b"v10") or len(encrypted) <= 3 or (len(encrypted) - 3) % 16:
+        raise ImportFailure("Unsupported Chrome cookie encryption.")
+    library = ctypes.CDLL("/usr/lib/system/libcommonCrypto.dylib")
+    crypt = library.CCCrypt
+    crypt.argtypes = [
+        ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p,
+        ctypes.c_size_t, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t,
+        ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
+    ]
+    crypt.restype = ctypes.c_int32
+    ciphertext = encrypted[3:]
+    output = ctypes.create_string_buffer(len(ciphertext))
+    length = ctypes.c_size_t()
+    # kCCDecrypt=1, kCCAlgorithmAES=0, kCCOptionPKCS7Padding=1 (CBC default).
+    status = crypt(1, 0, 1, key, len(key), b" " * 16, ciphertext, len(ciphertext),
+                   output, len(output), ctypes.byref(length))
+    if status:
+        raise ImportFailure("Chrome cookie decryption failed.")
+    plaintext = output.raw[:length.value]
+    # Schema 24 binds each encrypted value to its host via a SHA256 prefix.
+    # https://chromium.googlesource.com/chromium/src/+/refs/heads/main/net/extras/sqlite/sqlite_persistent_cookie_store.cc
+    if not hmac.compare_digest(plaintext[:32], hashlib.sha256(host.encode()).digest()):
+        raise ImportFailure("Chrome cookie host verification failed.")
+    try:
+        return plaintext[32:].decode("utf-8")
+    except UnicodeDecodeError:
+        raise ImportFailure("Chrome cookie contains invalid text.") from None
+
+
+def read_cookies(connection: sqlite3.Connection, key: bytes, domain: str) -> tuple[list[dict], dict]:
+    version = connection.execute("SELECT value FROM meta WHERE key = 'version'").fetchone()
+    required = {"host_key", "name", "value", "encrypted_value", "path", "expires_utc",
+                "is_persistent", "is_secure", "is_httponly", "samesite", "top_frame_site_key"}
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(cookies)")}
+    if version is None or str(version[0]) != "24" or not required.issubset(columns):
+        raise ImportFailure("Unsupported Chrome cookie schema; only version 24 is supported.")
+    rows = connection.execute("SELECT * FROM cookies WHERE host_key IN (?, ?)", (domain, "." + domain))
+    cookies = []
+    skipped = {"partitioned": 0, "multiAccount": 0, "expired": 0}
+    now = time.time()
+    for row in rows:
+        if row["top_frame_site_key"]:
+            skipped["partitioned"] += 1
+            continue
+        if domain == "x.com" and row["name"] == "auth_multi":
+            skipped["multiAccount"] += 1
+            continue
+        expires = row["expires_utc"] / 1_000_000 - CHROME_EPOCH_OFFSET if row["is_persistent"] else -1
+        if row["is_persistent"] and expires <= now:
+            skipped["expired"] += 1
+            continue
+        same_site = {-1: "Lax", 0: "None", 1: "Lax", 2: "Strict"}.get(row["samesite"])
+        if same_site is None or not all(isinstance(row[name], str) for name in ("host_key", "name", "path")):
+            raise ImportFailure("Chrome cookie contains unsupported metadata.")
+        if row["value"] or not isinstance(row["encrypted_value"], bytes):
+            raise ImportFailure("Chrome cookie has an unsupported value format.")
+        cookies.append({
+            "name": row["name"], "value": decrypt_cookie(row["encrypted_value"], row["host_key"], key),
+            "domain": row["host_key"], "path": row["path"], "expires": expires,
+            "httpOnly": bool(row["is_httponly"]), "secure": bool(row["is_secure"]), "sameSite": same_site,
+        })
+    return cookies, skipped
+
+
+def require_x_sign_in(cookies: list[dict]) -> None:
+    for name in ("auth_token", "ct0", "twid"):
+        matching = [cookie for cookie in cookies if cookie["name"] == name]
+        if len(matching) != 1 or not matching[0]["value"] or matching[0]["path"] != "/":
+            raise ImportFailure("Chrome has no unambiguous persisted X sign-in.")
 
 
 MAX_LEVELDB_BYTES = 256 * 1024 * 1024
@@ -194,7 +286,6 @@ def main() -> int:
     parser.add_argument("--x-handle", required=True, help="X handle already verified in Chrome")
     parser.add_argument("--bluesky-handle", required=True, help="Bluesky handle already verified in Chrome")
     parser.add_argument("--dev-null-handle", required=True, help="dev-null.sh handle already verified in Chrome")
-    parser.add_argument("--check-only", action="store_true", help="Validate capture; print metadata without exporting")
     arguments = parser.parse_args()
     handles = {
         "x": arguments.x_handle.lstrip("@"), "bluesky": arguments.bluesky_handle.lstrip("@"),
@@ -219,26 +310,14 @@ def main() -> int:
             states[platform] = {"cookies": cookies, "origins": []}
             accounts[platform] = {
                 "handle": handles[platform], "cookieCount": len(cookies), "skippedCookies": skipped,
-                "localStorageCount": 0, "file": platform + ".json", "importedSessionVerified": False,
+                "localStorageCount": 0,
             }
     require_x_sign_in(states["x"]["cookies"])
     if not any(cookie["name"] == "devnull-session" or cookie["name"].startswith("remember_web_") for cookie in states["dev-null"]["cookies"]):
         raise ImportFailure("The selected Chrome profile has no usable persisted dev-null.sh sign-in.")
     states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]
     accounts["bluesky"]["localStorageCount"] = len(local_storage)
-    manifest = {
-        "importedAt": datetime.now(timezone.utc).isoformat(), "source": "chrome",
-        "accounts": accounts, "note": "Source account handles were supplied after browser verification; imported session replay is not yet verified.",
-    }
-    if not arguments.check_only:
-        if SESSION_DIRECTORY.is_symlink():
-            raise ImportFailure("Session directory must not be a symbolic link.")
-        SESSION_DIRECTORY.mkdir(mode=0o700, parents=True, exist_ok=True)
-        os.chmod(SESSION_DIRECTORY, 0o700)
-        for platform, state in states.items():
-            atomic_json(SESSION_DIRECTORY / (platform + ".json"), state)
-        atomic_json(SESSION_DIRECTORY / "manifest.json", manifest)
-    print(json.dumps({"exported": not arguments.check_only, "profile": str(profile), **manifest}, indent=2))
+    report("chrome", profile, states, accounts)
     return 0
 
 
@@ -250,5 +329,5 @@ if __name__ == "__main__":
         raise SystemExit(1)
     except (OSError, sqlite3.Error, subprocess.TimeoutExpired, ValueError, TypeError, IndexError):
         # Do not emit exception payloads, which could include paths or row data.
-        print("Import failed: unable to read Chrome data or write private session files.", file=sys.stderr)
+        print("Import failed: unable to read Chrome data.", file=sys.stderr)
         raise SystemExit(1)

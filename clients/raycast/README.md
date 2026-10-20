@@ -37,7 +37,7 @@ Existing drafts from the former macOS composer load from the same private `nativ
 
 ## Local data and hosting
 
-Social sessions stay in Postslop's `server/storage/sessions/`; the extension never reads them. It hands each post to `postslop post --input=- --now --json` with its request ID, and reads results with `postslop show`. Every post Raycast sends also appears in the web client's history. Draft JSON and image copies live in Raycast's extension support directory with restricted permissions. Successfully published draft images and removed attachments are deleted unless a Saved Post still references them; original source images are preserved.
+Social sessions stay in Postslop's `server/storage/sessions.json`; the extension never reads them. It hands each post to `postslop post --input=- --now --json` with its request ID, and reads results with `postslop show`. Every post Raycast sends also appears in the web client's history. Draft JSON and image copies live in Raycast's extension support directory with restricted permissions. Successfully published draft images and removed attachments are deleted unless a Saved Post still references them; original source images are preserved.
 
 The extension works with a Postslop on this Mac. Remote hosting would need the command line to reach a remote core, which is not built yet.
 
