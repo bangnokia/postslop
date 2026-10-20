@@ -20,7 +20,7 @@ In another terminal, start an isolated server:
 ```sh
 DB_DSN="sqlite:$PWD/storage/test-database.sqlite" \
 POSTSLOP_SESSIONS_FILE="$PWD/storage/test-sessions.json" \
-POSTSLOP_POSTS_PATH="$PWD/storage/test-posts" \
+POSTSLOP_LOCK_FILE="$PWD/storage/test-publishing.lock" \
 POSTSLOP_MEDIA_PATH="$PWD/storage/test-media" \
 POSTSLOP_TOKEN_PATH="$PWD/storage/test-client-token" \
 POSTSLOP_X_TRANSPORT=http \

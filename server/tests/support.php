@@ -19,7 +19,7 @@ function test_app(string $directory): App
     PrivateFiles::directory($directory);
     putenv('DB_DSN=sqlite:' . $directory . '/database.sqlite');
     putenv('CACHE_STORE=array');
-    putenv('POSTSLOP_POSTS_PATH=' . $directory . '/posts');
+    putenv('POSTSLOP_LOCK_FILE=' . $directory . '/publishing.lock');
     putenv('POSTSLOP_MEDIA_PATH=' . $directory . '/media');
     putenv('POSTSLOP_SESSIONS_FILE=' . $directory . '/sessions.json');
     $app = require dirname(__DIR__) . '/app.php';
@@ -33,7 +33,7 @@ function test_publishing(App $app, array $publishers, string $directory): Publis
         $publishers,
         $app->container->get(Database::class),
         $app->container->get(Cache::class),
-        $directory . '/posts',
+        $directory . '/publishing.lock',
         $directory . '/media',
     );
 }

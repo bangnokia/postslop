@@ -13,7 +13,7 @@ export const fixtureEnv = {
   DB_DSN: `sqlite:${storage}/test-raycast-database.sqlite`,
   CACHE_STORE: "array",
   POSTSLOP_SESSIONS_FILE: `${storage}/test-sessions.json`,
-  POSTSLOP_POSTS_PATH: `${storage}/test-raycast-posts`,
+  POSTSLOP_LOCK_FILE: `${storage}/test-raycast-publishing.lock`,
   POSTSLOP_MEDIA_PATH: `${storage}/test-raycast-media`,
   POSTSLOP_X_TRANSPORT: "http",
   POSTSLOP_X_URL: `${fakes}/x`,

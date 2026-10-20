@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'sessions_file' => env('POSTSLOP_SESSIONS_FILE', dirname(__DIR__) . '/storage/sessions.json'),
-    'posts_path' => env('POSTSLOP_POSTS_PATH', dirname(__DIR__) . '/storage/posts'),
+    'lock_file' => env('POSTSLOP_LOCK_FILE', dirname(__DIR__) . '/storage/publishing.lock'),
     'media_path' => env('POSTSLOP_MEDIA_PATH', dirname(__DIR__) . '/storage/media'),
     'token_path' => env('POSTSLOP_TOKEN_PATH', dirname(__DIR__) . '/storage/client-token'),
     'x_transport' => env('POSTSLOP_X_TRANSPORT', 'browser'),

@@ -119,7 +119,7 @@ try {
     );
     check($publishing->accounts()['platforms'][0]['handle'] === 'fixture', 'Handle normalization failed');
 
-    $lock = fopen($directory . '/posts/publishing.lock', 'c');
+    $lock = fopen($directory . '/publishing.lock', 'c');
     flock($lock, LOCK_EX);
     $busy = PostRequest::fromApi([...$payload, 'requestId' => '00000000-0000-4000-8000-000000000003']);
     refused(fn() => $publishing->create($busy), Failure::BUSY);

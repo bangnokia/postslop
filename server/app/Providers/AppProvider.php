@@ -56,7 +56,7 @@ final class AppProvider implements Provider
                 ],
                 $container->get(Database::class),
                 $container->get(Cache::class),
-                config('postslop.posts_path'),
+                config('postslop.lock_file'),
                 config('postslop.media_path'),
             );
         });

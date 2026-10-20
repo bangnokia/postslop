@@ -31,7 +31,7 @@ final readonly class Publishing
         private array $publishers,
         private Database $db,
         private Cache $cache,
-        private string $directory,
+        private string $lockFile,
         private string $mediaDirectory,
     ) {}
 
@@ -528,8 +528,8 @@ final readonly class Publishing
      */
     private function tryLock(): mixed
     {
-        PrivateFiles::directory($this->directory);
-        $path = $this->directory . '/publishing.lock';
+        PrivateFiles::directory(dirname($this->lockFile));
+        $path = $this->lockFile;
         $lock = fopen($path, 'c');
         if ($lock === false) {
             throw new \RuntimeException('Could not open the publishing lock.');
