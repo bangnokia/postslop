@@ -4,15 +4,21 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a28f0f668c06100feeeb4b3d33c1c687",
+    "content-hash": "4655c633c2a9a39711fca0a33401160b",
     "packages": [
         {
             "name": "crabphp/framework",
             "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/crabphp/framework.git",
+                "reference": "daf0aacb13d43bc0710025b9f3ed97b6111f776c"
+            },
             "dist": {
-                "type": "path",
-                "url": "../framework",
-                "reference": "dea471d053512fb87be5b8d676eca130083e1d8d"
+                "type": "zip",
+                "url": "https://api.github.com/repos/crabphp/framework/zipball/daf0aacb13d43bc0710025b9f3ed97b6111f776c",
+                "reference": "daf0aacb13d43bc0710025b9f3ed97b6111f776c",
+                "shasum": ""
             },
             "require": {
                 "ext-mbstring": "*",
@@ -40,6 +46,7 @@
                 "ext-pcntl": "Supervised parallel workers and Unix signals",
                 "ext-posix": "Supervised worker termination and lifecycle control"
             },
+            "default-branch": true,
             "bin": [
                 "bin/crab"
             ],
@@ -96,10 +103,11 @@
                 }
             ],
             "description": "A minimal PHP 8.4 web framework on the Crab networking engine",
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "support": {
+                "source": "https://github.com/crabphp/framework/tree/main",
+                "issues": "https://github.com/crabphp/framework/issues"
+            },
+            "time": "2026-10-20T04:35:14+00:00"
         },
         {
             "name": "psr/clock",

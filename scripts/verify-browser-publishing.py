@@ -7,8 +7,8 @@ import urllib.request
 import uuid
 
 root = Path(__file__).resolve().parents[1]
-base = os.environ.get('POSTSLAP_TEST_URL', 'http://127.0.0.1:8091')
-upstream = os.environ.get('POSTSLAP_SIMULATION_URL', 'http://127.0.0.1:4902')
+base = os.environ.get('POSTSLOP_TEST_URL', 'http://127.0.0.1:8091')
+upstream = os.environ.get('POSTSLOP_SIMULATION_URL', 'http://127.0.0.1:4902')
 headers = {'Authorization': 'Bearer ' + (root/'storage/test-client-token').read_text().strip(), 'Content-Type': 'application/json'}
 
 def call(path, data=None):
@@ -23,7 +23,7 @@ def posts():
 status = call('/api/status')
 account = next(item for item in status['platforms'] if item['id'] == 'x')
 assert account['available'] and account['handle'] == 'tester', 'Refusing to publish to non-fixture account'
-request = {'requestId': str(uuid.uuid4()), 'text': 'Postslap background browser integration fixture', 'platforms': ['x'], 'images': [{
+request = {'requestId': str(uuid.uuid4()), 'text': 'Postslop background browser integration fixture', 'platforms': ['x'], 'images': [{
     'filename': 'fixture.png', 'mimeType': 'image/png', 'alt': 'A tiny generated fixture image',
     'data': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII='
 }]}

@@ -19,7 +19,7 @@ import {
 } from "@raycast/api";
 import { useEffect, useRef, useState } from "react";
 import { join } from "node:path";
-import { PostslapClient, ServerStatus } from "./client";
+import { PostslopClient, ServerStatus } from "./client";
 import {
   Attachment,
   cleanPostURL,
@@ -85,13 +85,13 @@ function SavedPosts({
   );
 }
 
-export default function Postslap() {
+export default function Postslop() {
   const { push } = useNavigation();
   const [client] = useState(
     () =>
-      new PostslapClient(
+      new PostslopClient(
         getPreferenceValues<{ projectPath?: string }>().projectPath ||
-          "/Users/daudau/Code/crabphp/postslap",
+          "/Users/daudau/Code/bangnokia/postslop",
       ),
   );
   const store = useRef<DraftStore | undefined>(undefined);
@@ -102,7 +102,7 @@ export default function Postslap() {
   const [loadingError, setLoadingError] = useState<string>();
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string>();
-  const [notice, setNotice] = useState("Connecting to local Postslap…");
+  const [notice, setNotice] = useState("Connecting to local Postslop…");
   const [formVersion, setFormVersion] = useState(0);
 
   async function refreshAccounts() {
@@ -167,7 +167,7 @@ export default function Postslap() {
         }
       } catch {
         setNotice(
-          "Could not read the background result. Reopen Postslap to recover it.",
+          "Could not read the background result. Reopen Postslop to recover it.",
         );
       }
     }, 1000);
@@ -397,11 +397,11 @@ export default function Postslap() {
   }
 
   if (loadingError)
-    return <Detail navigationTitle="Postslap" markdown={loadingError} />;
+    return <Detail navigationTitle="Postslop" markdown={loadingError} />;
   if (!draft)
     return (
       <Detail
-        navigationTitle="Postslap"
+        navigationTitle="Postslop"
         isLoading
         markdown={
           busy ? `${busy}\n\nYour draft is saved.` : "Loading your saved draft…"
@@ -423,7 +423,7 @@ export default function Postslap() {
   return (
     <Form
       key={formVersion}
-      navigationTitle="Postslap"
+      navigationTitle="Postslop"
       isLoading={refreshing || Boolean(busy)}
       actions={
         <ActionPanel>

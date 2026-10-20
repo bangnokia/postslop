@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { PostslapClient } from "./client";
+import type { PostslopClient } from "./client";
 import { DraftStore, fullyPublished, validateResult } from "./draft.ts";
 import type { Draft } from "./draft";
 
@@ -34,7 +34,7 @@ export interface TaskNotice {
 
 export async function runTask(
   store: DraftStore,
-  client: PostslapClient,
+  client: PostslopClient,
   id: string,
 ): Promise<TaskNotice | undefined> {
   const draft = store.loadTask(id);
@@ -72,7 +72,7 @@ export async function runTask(
     if (fullyPublished(result)) {
       return {
         success: true,
-        title: `Postslap: published to ${result.results.length} destination${result.results.length === 1 ? "" : "s"}`,
+        title: `Postslop: published to ${result.results.length} destination${result.results.length === 1 ? "" : "s"}`,
       };
     }
     const published = result.results.filter(
@@ -82,8 +82,8 @@ export async function runTask(
     return {
       success: false,
       title: published
-        ? `Postslap: published to ${published} destination${published === 1 ? "" : "s"}`
-        : "Postslap: post saved",
+        ? `Postslop: published to ${published} destination${published === 1 ? "" : "s"}`
+        : "Postslop: post saved",
       message:
         pending && published + pending === result.results.length
           ? `${pending} awaiting review`
@@ -99,6 +99,6 @@ export async function runTask(
     };
     store.saveTaskResult(id, retained);
     store.finishTask(draft);
-    return { success: false, title: "Postslap: draft kept", message: reason };
+    return { success: false, title: "Postslop: draft kept", message: reason };
   }
 }

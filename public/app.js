@@ -5,7 +5,7 @@ const destinations = [...document.querySelectorAll('input[name="destination"]')]
 const status = document.querySelector('#draft-status');
 const publishButton = document.querySelector('#publish');
 const clearButton = document.querySelector('#clear-draft');
-const token = document.querySelector('meta[name="postslap-token"]').content;
+const token = document.querySelector('meta[name="postslop-token"]').content;
 const imageInput = document.querySelector('#image-files');
 const attachments = document.querySelector('#attachments');
 const results = document.querySelector('#publish-results');
@@ -19,7 +19,7 @@ let lastResult = null;
 let restoring = true;
 let saveChain = Promise.resolve();
 const database = new Promise((resolve, reject) => {
-    const request = indexedDB.open('postslap', 1);
+    const request = indexedDB.open('postslop', 1);
     request.onupgradeneeded = () => request.result.createObjectStore('drafts');
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(new Error('Local draft storage is unavailable.'));

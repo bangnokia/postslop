@@ -1,4 +1,4 @@
-simulation: postslap-publishing
+simulation: postslop-publishing
 routing: path
 mocks:
   - routeKey: x

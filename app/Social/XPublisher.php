@@ -200,7 +200,7 @@ final class XPublisher implements Publisher
 
     private function operation(string $html, array $state): array
     {
-        $bundleUrl = config('postslap.x_bundle_url');
+        $bundleUrl = config('postslop.x_bundle_url');
         if (!$bundleUrl) {
             if (!preg_match(
                 '~https://abs\.twimg\.com/responsive-web/client-web/main\.[a-zA-Z0-9]+\.js~',
@@ -250,7 +250,7 @@ final class XPublisher implements Publisher
 
     private function upload(ImageAttachment $image, array $headers): string
     {
-        $url = rtrim(config('postslap.x_upload_url', 'https://upload.x.com'), '/') . '/i/media/upload.json';
+        $url = rtrim(config('postslop.x_upload_url', 'https://upload.x.com'), '/') . '/i/media/upload.json';
         $client = $this->http->timeout(35)->retry(0);
         $response = $client->request(
             'POST',
@@ -394,12 +394,12 @@ final class XPublisher implements Publisher
         return [
             'platform' => 'x',
             'status' => 'unknown',
-            'error' => 'X did not confirm the result. Check your X profile before posting again; Postslap will not retry automatically.',
+            'error' => 'X did not confirm the result. Check your X profile before posting again; Postslop will not retry automatically.',
         ];
     }
 
     private function url(): string
     {
-        return rtrim(config('postslap.x_url', 'https://x.com'), '/');
+        return rtrim(config('postslop.x_url', 'https://x.com'), '/');
     }
 }

@@ -30,7 +30,7 @@ final readonly class LocalAccess implements Middleware
             || $origin !== ''
             && !in_array($origin, array_map(static fn(string $allowed): string => 'http://' . $allowed, $hosts), true)
         ) {
-            return Response::json(['error' => ['message' => 'Postslap accepts local requests only.']], 403);
+            return Response::json(['error' => ['message' => 'Postslop accepts local requests only.']], 403);
         }
         $openingComposer =
             $request->getMethod() === 'GET'
@@ -42,7 +42,7 @@ final readonly class LocalAccess implements Middleware
         }
         if (str_starts_with($request->getUri()->getPath(), '/api/')) {
             if (!hash_equals('Bearer ' . $this->token->read(), $request->getHeaderLine('Authorization'))) {
-                return Response::json(['error' => ['message' => 'Postslap requires its local access token.']], 401);
+                return Response::json(['error' => ['message' => 'Postslop requires its local access token.']], 401);
             }
             if (
                 $request->getMethod() === 'POST'

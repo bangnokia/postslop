@@ -20,12 +20,12 @@ function x_check(bool $condition, string $message): void
     }
 }
 
-new App(new Config(['postslap' => [
+new App(new Config(['postslop' => [
     'x_url' => 'https://x.fixture.test',
     'x_bundle_url' => 'https://assets.fixture.test/main.js',
 ]]));
 
-$directory = sys_get_temp_dir() . '/postslap-x-rejections-' . bin2hex(random_bytes(6));
+$directory = sys_get_temp_dir() . '/postslop-x-rejections-' . bin2hex(random_bytes(6));
 $sessions = new SessionStore($directory);
 $sessions->write('x', [
     'cookies' => [

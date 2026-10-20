@@ -6,7 +6,7 @@ Base URL: `http://127.0.0.1:8087`. Every `/api/` request requires `Authorization
 
 Read-only authenticated sign-in checks (cached for 30 seconds). Bluesky may refresh an expired access token using the saved refresh token. Returns:
 
-X is checked through Postslap's private background browser worker. It opens no visible window and returns unavailable if an account check is required. The HTTP contract and request-ID rules are shared by both transports.
+X is checked through Postslop's private background browser worker. It opens no visible window and returns unavailable if an account check is required. The HTTP contract and request-ID rules are shared by both transports.
 
 ```json
 {

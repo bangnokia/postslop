@@ -27,4 +27,4 @@ if (!is_file($path)) {
     }
 }
 chmod($path, 0o600);
-echo "Postslap local storage is ready.\n";
+echo "Postslop local storage is ready.\n";

@@ -88,7 +88,7 @@ final readonly class PostInput
             if (($upload['mimeType'] ?? $mime) !== $mime) {
                 throw new HttpException(422, 'The image type does not match its contents.');
             }
-            $filename = 'postslap-' . (count($images) + 1) . '.' . $extensions[$mime];
+            $filename = 'postslop-' . (count($images) + 1) . '.' . $extensions[$mime];
             $images[] = new ImageAttachment($filename, $mime, $bytes, $alt, $dimensions[0], $dimensions[1]);
         }
         sort($platforms);

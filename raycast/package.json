@@ -1,8 +1,8 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "postslap",
-  "title": "Postslap",
-  "description": "Write once and publish with your local Postslap sessions.",
+  "name": "postslop",
+  "title": "Postslop",
+  "description": "Write once and publish with your local Postslop sessions.",
   "icon": "extension-icon.png",
   "author": "local",
   "license": "MIT",
@@ -14,26 +14,26 @@
   ],
   "commands": [
     {
-      "name": "postslap",
-      "title": "Postslap",
-      "description": "Compose, attach images, and publish inside Raycast using your local Postslap API.",
+      "name": "postslop",
+      "title": "Postslop",
+      "description": "Compose, attach images, and publish inside Raycast using your local Postslop API.",
       "mode": "view"
     },
     {
       "name": "publish-background",
       "title": "Finish Publishing",
-      "description": "Finishes a saved Postslap submission in the background and shows its result.",
+      "description": "Finishes a saved Postslop submission in the background and shows its result.",
       "mode": "no-view"
     }
   ],
   "preferences": [
     {
       "name": "projectPath",
-      "title": "Postslap Project Folder",
-      "description": "Local folder containing storage/client-token. Social sessions stay in Postslap.",
+      "title": "Postslop Project Folder",
+      "description": "Local folder containing storage/client-token. Social sessions stay in Postslop.",
       "type": "directory",
       "required": false,
-      "default": "/Users/daudau/Code/crabphp/postslap"
+      "default": "/Users/daudau/Code/bangnokia/postslop"
     }
   ],
   "scripts": {

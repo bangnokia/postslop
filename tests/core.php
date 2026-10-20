@@ -48,7 +48,7 @@ $publisher = new class implements Publisher {
         return ['platform' => 'x', 'status' => 'published', 'url' => 'https://x.com/fixture/status/123'];
     }
 };
-$directory = sys_get_temp_dir() . '/postslap-core-' . bin2hex(random_bytes(6));
+$directory = sys_get_temp_dir() . '/postslop-core-' . bin2hex(random_bytes(6));
 $publishing = new Publishing(['x' => $publisher], $directory);
 $payload = [
     'requestId' => '00000000-0000-4000-8000-000000000001',

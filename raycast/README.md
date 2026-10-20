@@ -1,6 +1,6 @@
-# Postslap for Raycast
+# Postslop for Raycast
 
-Search **Postslap** in Raycast to open a fresh **New Post** composer without opening a separate app. Previous drafts and results are preserved in **Saved Posts**. The extension calls the existing local Postslap API; the web composer remains available at <http://127.0.0.1:8087>.
+Search **Postslop** in Raycast to open a fresh **New Post** composer without opening a separate app. Previous drafts and results are preserved in **Saved Posts**. The extension calls the existing local Postslop API; the web composer remains available at <http://127.0.0.1:8087>.
 
 ## Install locally
 
@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-This compiles a small background image helper and installs the extension in Raycast. The **Postslap Project Folder** preference points to the project containing `cua` and `storage/client-token`. If needed, the extension starts the local PHP server in the background and waits for readiness. No macOS composer window or visible publishing browser is launched.
+This compiles a small background image helper and installs the extension in Raycast. The **Postslop Project Folder** preference points to the project containing `cua` and `storage/client-token`. If needed, the extension starts the local PHP server in the background and waits for readiness. No macOS composer window or visible publishing browser is launched.
 
 ## Compose
 
@@ -37,7 +37,7 @@ Existing drafts from the former macOS composer load from the same private `nativ
 
 ## Local data and hosting
 
-Social sessions stay in Postslap's `storage/sessions/`; the extension reads only the local client token. Draft JSON and image copies live in Raycast's extension support directory with restricted permissions. Successfully published draft images and removed attachments are deleted unless a Saved Post still references them; original source images are preserved. HTTP requests go to `127.0.0.1:8087` and redirects are rejected.
+Social sessions stay in Postslop's `storage/sessions/`; the extension reads only the local client token. Draft JSON and image copies live in Raycast's extension support directory with restricted permissions. Successfully published draft images and removed attachments are deleted unless a Saved Post still references them; original source images are preserved. HTTP requests go to `127.0.0.1:8087` and redirects are rejected.
 
 The web UI and Raycast share the same API contract. This extension currently connects locally. Remote hosting still requires server-side HTTPS, authentication and session setup, plus a configurable client connection; it is not enabled by this change.
 

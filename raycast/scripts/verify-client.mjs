@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { PostslapClient } from "../src/client.ts";
+import { PostslopClient } from "../src/client.ts";
 import {
   DraftStore,
   newDraft,
@@ -21,9 +21,9 @@ import {
 import { importImage } from "../src/images.ts";
 
 const project = resolve(import.meta.dirname, "../..");
-const baseURL = process.env.POSTSLAP_TEST_URL || "http://127.0.0.1:8091";
+const baseURL = process.env.POSTSLOP_TEST_URL || "http://127.0.0.1:8091";
 const simulation =
-  process.env.POSTSLAP_SIMULATION_URL || "http://127.0.0.1:4900";
+  process.env.POSTSLOP_SIMULATION_URL || "http://127.0.0.1:4900";
 for (const value of [baseURL, simulation]) {
   const url = new URL(value);
   assert.equal(
@@ -31,9 +31,9 @@ for (const value of [baseURL, simulation]) {
     "127.0.0.1",
     "Only isolated loopback fixtures are allowed",
   );
-  assert.notEqual(url.port, "8087", "Never use the production Postslap server");
+  assert.notEqual(url.port, "8087", "Never use the production Postslop server");
 }
-const client = new PostslapClient(
+const client = new PostslopClient(
   project,
   baseURL,
   join(project, "storage/test-client-token"),
@@ -49,7 +49,7 @@ assert.deepEqual(
   "Refusing to send fixture posts to real accounts",
 );
 
-const support = mkdtempSync(join(tmpdir(), "postslap-raycast-"));
+const support = mkdtempSync(join(tmpdir(), "postslop-raycast-"));
 const store = new DraftStore(support);
 const source = join(support, "source.png");
 writeFileSync(
@@ -167,5 +167,5 @@ writeFileSync(store.path, "{broken draft", { mode: 0o600 });
 assert.throws(() => store.load(), /preserved/);
 assert.equal(readFileSync(store.path, "utf8"), "{broken draft");
 console.log(
-  "PASS: actual Raycast client and image helper against isolated Postslap + Postman upstreams; image publish, duplicate suppression, failed-only retries, uncertain recovery, draft persistence, private permissions, and safe image cleanup.",
+  "PASS: actual Raycast client and image helper against isolated Postslop + Postman upstreams; image publish, duplicate suppression, failed-only retries, uncertain recovery, draft persistence, private permissions, and safe image cleanup.",
 );

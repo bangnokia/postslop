@@ -20,7 +20,7 @@ final class PrivateFiles
     public static function json(string $path, array $data): void
     {
         self::directory(dirname($path));
-        $temporary = tempnam(dirname($path), '.postslap-');
+        $temporary = tempnam(dirname($path), '.postslop-');
         if ($temporary === false) {
             throw new \RuntimeException('Could not create a private state file.');
         }

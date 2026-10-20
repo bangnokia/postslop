@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the real local Postslap server against the Postman simulation."""
+"""Exercise the real local Postslop server against the Postman simulation."""
 import base64
 import json
 import os
@@ -9,8 +9,8 @@ import urllib.request
 import uuid
 
 root = Path(__file__).resolve().parents[1]
-app = os.environ.get('POSTSLAP_TEST_URL', 'http://127.0.0.1:8091').rstrip('/')
-simulation = os.environ.get('POSTSLAP_SIMULATION_URL', 'http://127.0.0.1:4900').rstrip('/')
+app = os.environ.get('POSTSLOP_TEST_URL', 'http://127.0.0.1:8091').rstrip('/')
+simulation = os.environ.get('POSTSLOP_SIMULATION_URL', 'http://127.0.0.1:4900').rstrip('/')
 token = (root / 'storage/test-client-token').read_text().strip()
 
 def request(url, data=None, authenticated=False):
@@ -39,7 +39,7 @@ code, result = request(app + '/api/status', authenticated=True)
 assert code == 200 and all(item['available'] for item in result['platforms']), result
 assert {item['id']: item['handle'].lstrip('@') for item in result['platforms']} == {'x': 'tester', 'bluesky': 'tester.test', 'dev-null': 'tester'}, 'Refusing to publish fixture posts to non-fixture accounts'
 image = {'mimeType': 'image/png', 'alt': 'A one-pixel fixture image', 'data': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII='}
-post = {'requestId': str(uuid.uuid4()), 'text': 'Postslap local simulation: image contract', 'platforms': ['x', 'bluesky', 'dev-null'], 'images': [image]}
+post = {'requestId': str(uuid.uuid4()), 'text': 'Postslop local simulation: image contract', 'platforms': ['x', 'bluesky', 'dev-null'], 'images': [image]}
 code, result = request(app + '/api/posts', post, True)
 assert code == 200 and result['status'] == 'published', result
 assert counts() == {'x': 1, 'bluesky': 1, 'dev-null': 1}, counts()

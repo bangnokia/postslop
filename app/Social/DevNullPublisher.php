@@ -316,7 +316,7 @@ final readonly class DevNullPublisher implements Publisher
 
     private function baseUrl(): string
     {
-        $url = rtrim((string) config('postslap.dev_null_url', 'https://dev-null.sh'), '/');
+        $url = rtrim((string) config('postslop.dev_null_url', 'https://dev-null.sh'), '/');
         $parts = parse_url($url);
         $loopback =
             ($parts['scheme'] ?? '') === 'http'

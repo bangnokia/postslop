@@ -222,7 +222,7 @@ final readonly class BlueskyPublisher implements Publisher
 
     private function serverUrl(array $account): string
     {
-        $override = config('postslap.bluesky_url');
+        $override = config('postslop.bluesky_url');
         $url = rtrim(
             (string) (
                 $override !== '' && $override !== null ? $override : $account['pdsUrl'] ?? $account['service'] ?? ''

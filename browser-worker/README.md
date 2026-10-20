@@ -1,6 +1,6 @@
-# Postslap X browser worker
+# Postslop X browser worker
 
-The local PHP publisher sends one JSON request on stdin to `node browser-worker/x-worker.mjs` and receives one JSON result on stdout. Normal Playwright Firefox runs headlessly in Postslap’s private `storage/browser/x/firefox` profile. It does not use or open the user’s regular browser profile.
+The local PHP publisher sends one JSON request on stdin to `node browser-worker/x-worker.mjs` and receives one JSON result on stdout. Normal Playwright Firefox runs headlessly in Postslop’s private `storage/browser/x/firefox` profile. It does not use or open the user’s regular browser profile.
 
 Install the pinned runtime:
 
@@ -20,6 +20,6 @@ A CreateTweet request guard blocks additional website-level POST requests after 
 
 The initial Chromium implementation exposed an important failure: it sent three upstream requests from one click when a connection closed before response headers. A Playwright route guard could not intercept those internal retries. Firefox's default also retried; the explicit retry ceiling above removed that behavior in six independent audit trials and in the worker fixture. The browser profile lives in its own engine subdirectory, while request journals and the lock stay at `storage/browser/x` so changing engines does not discard prior outcomes.
 
-Run local browser checks with `npm test`. They exercise multiline text, image bytes and alt text, account mismatch, explicit rejection, server errors, and interrupted responses against a local website fixture. They make no social posts. The fixture is also available as `PORT=4899 X_FIXTURE_PREFIX=/x-web node test/fixture.mjs`; a worker can use its loopback `baseUrl` only with `POSTSLAP_TEST_MODE=1`.
+Run local browser checks with `npm test`. They exercise multiline text, image bytes and alt text, account mismatch, explicit rejection, server errors, and interrupted responses against a local website fixture. They make no social posts. The fixture is also available as `PORT=4899 X_FIXTURE_PREFIX=/x-web node test/fixture.mjs`; a worker can use its loopback `baseUrl` only with `POSTSLOP_TEST_MODE=1`.
 
 The site can change its controls or reject automated publishing. A verified connection establishes sign-in, not permission to publish. The media alt-text editor is covered by the fixture; its current live UI still needs verification when a post with alt text is requested.

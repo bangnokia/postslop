@@ -19,7 +19,7 @@ export interface ServerStatus {
   }[];
 }
 
-export class PostslapClient {
+export class PostslopClient {
   readonly projectPath: string;
   readonly baseURL: string;
   readonly tokenPath: string;
@@ -44,7 +44,7 @@ export class PostslapClient {
       token = (await readFile(this.tokenPath, "utf8")).trim();
     } catch {
       throw new Error(
-        "Cannot read the local access token. Check the Postslap Project Folder preference and server setup.",
+        "Cannot read the local access token. Check the Postslop Project Folder preference and server setup.",
       );
     }
     if (!token) throw new Error("The local access token is empty.");
@@ -61,12 +61,12 @@ export class PostslapClient {
     });
     const data = await response.json().catch(() => {
       throw new Error(
-        `Postslap returned an unreadable response (HTTP ${response.status}).`,
+        `Postslop returned an unreadable response (HTTP ${response.status}).`,
       );
     });
     if (!response.ok)
       throw new Error(
-        data.error?.message || `Postslap returned HTTP ${response.status}.`,
+        data.error?.message || `Postslop returned HTTP ${response.status}.`,
       );
     return data as T;
   }
@@ -111,7 +111,7 @@ export class PostslapClient {
       });
     } catch {
       throw new Error(
-        "Could not start Postslap. Check the project folder and PHP installation.",
+        "Could not start Postslop. Check the project folder and PHP installation.",
       );
     }
     const deadline = Date.now() + 30_000;
@@ -132,7 +132,7 @@ export class PostslapClient {
       }
     }
     throw new Error(
-      "Postslap did not become ready. Refresh accounts to try again.",
+      "Postslop did not become ready. Refresh accounts to try again.",
     );
   }
 

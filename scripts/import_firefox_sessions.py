@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Import only Postslap's three sites from an explicitly selected Firefox profile.
+"""Import only Postslop's three sites from an explicitly selected Firefox profile.
 
 No network requests or browser changes are made. Verify the signed-in identities in
 Firefox before supplying their handles. Output contains credentials and stays in
@@ -75,7 +75,7 @@ def database_snapshot(path: Path):
     files = stable_database_files(path)
     # SQLite replays committed WAL frames itself. The complete temporary snapshot
     # is private, never enters the repository, and is deleted even on failure.
-    with tempfile.TemporaryDirectory(prefix="postslap-firefox-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="postslop-firefox-") as temporary:
         os.chmod(temporary, 0o700)
         snapshot = Path(temporary) / "snapshot.sqlite"
         for suffix, data in files.items():

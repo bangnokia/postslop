@@ -78,7 +78,7 @@ try {
 } catch (error) {
   await rm(join(input.profilePath, 'last-published-check.png'), { force: true }).catch(() => {});
   if (page) await page.screenshot({ path: join(input.profilePath, 'last-published-check.png'), timeout: 3000 }).catch(() => {});
-  result = { verified: false, url, phase, errorName: error?.name === 'TimeoutError' ? 'TimeoutError' : 'Error', error: 'Postslap could not verify the published article.' };
+  result = { verified: false, url, phase, errorName: error?.name === 'TimeoutError' ? 'TimeoutError' : 'Error', error: 'Postslop could not verify the published article.' };
 } finally {
   clearTimeout(timer);
   if (context) await context.close().catch(() => {});

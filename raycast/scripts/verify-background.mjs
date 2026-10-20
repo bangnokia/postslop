@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
-import { PostslapClient } from "../src/client.ts";
+import { PostslopClient } from "../src/client.ts";
 import {
   DraftStore,
   newDraft,
@@ -12,10 +12,10 @@ import {
 } from "../src/draft.ts";
 import { queueTask, runTask, taskIsActive } from "../src/background.ts";
 const project = resolve(import.meta.dirname, "../..");
-const url = process.env.POSTSLAP_TEST_URL || "http://127.0.0.1:8091";
+const url = process.env.POSTSLOP_TEST_URL || "http://127.0.0.1:8091";
 assert.equal(new URL(url).hostname, "127.0.0.1");
 assert.notEqual(new URL(url).port, "8087");
-const client = new PostslapClient(
+const client = new PostslopClient(
   project,
   url,
   join(project, "storage/test-client-token"),
@@ -28,7 +28,7 @@ assert.deepEqual(
   { x: "tester", bluesky: "tester.test", "dev-null": "tester" },
 );
 const store = new DraftStore(
-  mkdtempSync(join(tmpdir(), "postslap-background-")),
+  mkdtempSync(join(tmpdir(), "postslop-background-")),
 );
 const draft = { ...newDraft(), text: "Background publishing fixture" };
 const start = performance.now();
@@ -109,8 +109,8 @@ assert.equal(
 );
 assert.equal(store.load().requestId, unknown.requestId);
 assert.equal(store.load().backgroundTask, undefined);
-const disconnected = new PostslapClient(
-  "/nonexistent-postslap-fixture",
+const disconnected = new PostslopClient(
+  "/nonexistent-postslop-fixture",
   "http://127.0.0.1:1",
   join(project, "storage/test-client-token"),
 );

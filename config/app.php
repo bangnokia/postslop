@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'name' => env('APP_NAME', 'Postslap'),
+    'name' => env('APP_NAME', 'Postslop'),
 
     // Show the details of a failure to the client. Never in production.
     'debug' => env('APP_DEBUG', false),

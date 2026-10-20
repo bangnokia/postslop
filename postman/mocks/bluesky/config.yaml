@@ -1,6 +1,6 @@
 version: 1
-name: Postslap bluesky website fixture
-slug: postslap-bluesky
+name: Postslop bluesky website fixture
+slug: postslop-bluesky
 protocol: http
 interceptRequests: true
 scenarios:

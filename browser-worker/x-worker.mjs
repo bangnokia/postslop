@@ -20,7 +20,7 @@ class WorkerError extends Error {
 }
 
 async function lockProfile(profilePath) {
-  const path = join(profilePath, 'postslap.lock');
+  const path = join(profilePath, 'postslop.lock');
   try {
     const handle = await open(path, 'wx', 0o600);
     await handle.writeFile(String(process.pid));
@@ -36,7 +36,7 @@ async function lockProfile(profilePath) {
       await rm(path);
       return lockProfile(profilePath);
     }
-    throw new WorkerError('Postslap is already checking or publishing to X. Wait for that operation to finish.', 'busy');
+    throw new WorkerError('Postslop is already checking or publishing to X. Wait for that operation to finish.', 'busy');
   }
 }
 
@@ -45,7 +45,7 @@ async function readJson(path) {
     return JSON.parse(await readFile(path, 'utf8'));
   } catch (error) {
     if (error.code === 'ENOENT') return null;
-    throw new WorkerError('Postslap could not read its private X session state.');
+    throw new WorkerError('Postslop could not read its private X session state.');
   }
 }
 
@@ -67,10 +67,10 @@ function validateInput(input) {
   if (!isAbsolute(input.sessionPath ?? '') || !isAbsolute(input.profilePath ?? '')) {
     throw new WorkerError('The X worker requires absolute private session and profile paths.');
   }
-  const testing = process.env.POSTSLAP_TEST_MODE === '1';
+  const testing = process.env.POSTSLOP_TEST_MODE === '1';
   if (!testing && (resolve(input.profilePath) !== join(appRoot, 'storage/browser/x')
     || resolve(input.sessionPath) !== join(appRoot, 'storage/sessions/x.json'))) {
-    throw new WorkerError('The X worker only uses Postslap’s private X session and browser profile.');
+    throw new WorkerError('The X worker only uses Postslop’s private X session and browser profile.');
   }
   if (!/^[A-Za-z0-9_]{1,15}$/.test(input.expectedHandle ?? '')) {
     throw new WorkerError('The expected X account is missing.');
@@ -118,7 +118,7 @@ function validateInput(input) {
 
 async function importSession(context, input) {
   const state = await readJson(input.sessionPath);
-  if (!Array.isArray(state?.cookies)) throw new WorkerError('Import your signed-in X session into Postslap first.', 'session_missing');
+  if (!Array.isArray(state?.cookies)) throw new WorkerError('Import your signed-in X session into Postslop first.', 'session_missing');
   const cookies = state.cookies.filter((cookie) => cookie && ['x.com', '.x.com'].includes(cookie.domain)
     && typeof cookie.name === 'string' && typeof cookie.value === 'string'
     && (cookie.expires === -1 || (Number.isFinite(cookie.expires) && cookie.expires > Date.now() / 1000)))
@@ -128,12 +128,12 @@ async function importSession(context, input) {
       sameSite: ['Strict', 'Lax', 'None'].includes(sameSite) ? sameSite : 'Lax',
     }));
   if (!['auth_token', 'ct0'].every((name) => cookies.some((cookie) => cookie.name === name && cookie.value))) {
-    throw new WorkerError('The imported X session is missing valid authentication cookies. Refresh it in Postslap.', 'session_missing');
+    throw new WorkerError('The imported X session is missing valid authentication cookies. Refresh it in Postslop.', 'session_missing');
   }
   const fingerprint = createHash('sha256').update(JSON.stringify(cookies
     .filter((cookie) => ['auth_token', 'ct0'].includes(cookie.name))
     .map(({ name, value, domain }) => [name, value, domain]).sort())).digest('hex');
-  const metadataPath = join(input.profilePath, 'postslap-session.json');
+  const metadataPath = join(input.profilePath, 'postslop-session.json');
   const previous = await readJson(metadataPath);
   if (previous?.sourceAuthentication !== fingerprint || previous?.browserEngine !== 'firefox') {
     await context.clearCookies({ domain: /(^|\.)x\.com$/ });
@@ -150,19 +150,19 @@ async function signedInAccount(page, input) {
     await profile.waitFor({ state: 'visible', timeout: 20000 });
   } catch {
     await requireNoChallenge(page);
-    throw new WorkerError('X did not confirm a signed-in account in Postslap’s background browser. Your session may need refreshing, or X may require an account check.', 'signed_out');
+    throw new WorkerError('X did not confirm a signed-in account in Postslop’s background browser. Your session may need refreshing, or X may require an account check.', 'signed_out');
   }
   await requireNoChallenge(page);
   const href = await profile.getAttribute('href');
   const match = /^\/([A-Za-z0-9_]{1,15})\/?$/.exec(href ?? '');
   if (!match || match[1].toLowerCase() !== input.expectedHandle.toLowerCase()) {
-    throw new WorkerError('The signed-in X account does not match Postslap’s expected account. Nothing was posted.', 'account_mismatch');
+    throw new WorkerError('The signed-in X account does not match Postslop’s expected account. Nothing was posted.', 'account_mismatch');
   }
   return match[1];
 }
 
 async function requireNoChallenge(page) {
-  const challenge = new WorkerError('X requires an account verification check before Postslap can continue. Nothing was posted.', 'challenge');
+  const challenge = new WorkerError('X requires an account verification check before Postslop can continue. Nothing was posted.', 'challenge');
   if (/^\/(?:account\/access|i\/flow\/(?:challenge|verify))\b/.test(new URL(page.url()).pathname)) throw challenge;
   const frames = page.locator('iframe[src*="captcha" i], iframe[src*="arkoselabs" i], iframe[src*="challenges.cloudflare.com" i]');
   for (const frame of await frames.all()) if (await frame.isVisible()) throw challenge;
@@ -247,7 +247,7 @@ async function publish(page, input, handle, markSubmitted, diagnostic) {
     .waitFor({ state: 'hidden', timeout: 5000 });
   diagnostic.stage = 'images';
   try { await addImages(page, composerDialog, input); }
-  catch { throw new WorkerError('Postslap could not attach every image and its alt text in X. Nothing was posted.', 'image_failed'); }
+  catch { throw new WorkerError('Postslop could not attach every image and its alt text in X. Nothing was posted.', 'image_failed'); }
   diagnostic.stage = 'compose';
   const publishButton = composerDialog.locator('[data-testid="tweetButton"]');
   await publishButton.waitFor({ state: 'visible' });
@@ -284,16 +284,16 @@ async function publish(page, input, handle, markSubmitted, diagnostic) {
     const url = new URL(response.url());
     return url.origin === new URL(input.baseUrl).origin && /\/graphql\/[^/]+\/CreateTweet$/.test(url.pathname)
       && response.request().method() === 'POST';
-  }, { timeout: process.env.POSTSLAP_TEST_MODE === '1' ? 4000 : 25000 }).catch(() => null);
+  }, { timeout: process.env.POSTSLOP_TEST_MODE === '1' ? 4000 : 25000 }).catch(() => null);
   // A durable record precedes the only click. A crash or lost response must never cause an automatic duplicate.
   await markSubmitted();
   await publishButton.click({ timeout: 10000 });
   const response = await Promise.race([responsePromise, guardRejection]);
   if (guardRejected && !sentCreateTweet) return {
     platform: 'x', status: 'failed', code: 'composer_unavailable',
-    error: 'X prepared different text or attachments than this draft. Postslap blocked the request before it was sent.',
+    error: 'X prepared different text or attachments than this draft. Postslop blocked the request before it was sent.',
   };
-  if (!response) return { platform: 'x', status: 'unknown', code: 'unknown', error: 'X did not confirm the result after submission. Check your X profile before trying again; Postslap will not resubmit this request.' };
+  if (!response) return { platform: 'x', status: 'unknown', code: 'unknown', error: 'X did not confirm the result after submission. Check your X profile before trying again; Postslop will not resubmit this request.' };
   const httpStatus = response.status();
   if (httpStatus >= 500 || httpStatus === 408) return { platform: 'x', status: 'unknown', code: 'unknown', error: 'X returned a server error after submission. The result is uncertain; check your profile before trying again.' };
   let body;
@@ -305,8 +305,8 @@ async function publish(page, input, handle, markSubmitted, diagnostic) {
     const codes = (Array.isArray(errors) ? errors : []).map((error) => error.code).filter(Number.isInteger);
     if (codes.includes(187)) return { platform: 'x', status: 'unknown', code: 'unknown', error: 'X reported duplicate content. An earlier network attempt may already have posted it; check your profile before trying again.' };
     const reason = codes.includes(226)
-      ? 'X rejected the post as suspected automation (code 226). Postslap stopped; no further attempt was made.'
-      : `X rejected this post${codes.length ? ` (code ${codes.join(', ')})` : ''}. Postslap stopped; no further attempt was made.`;
+      ? 'X rejected the post as suspected automation (code 226). Postslop stopped; no further attempt was made.'
+      : `X rejected this post${codes.length ? ` (code ${codes.join(', ')})` : ''}. Postslop stopped; no further attempt was made.`;
     const code = codes.includes(226) ? 'automation_rejected' : codes.includes(344) || httpStatus === 429 ? 'rate_limited' : 'rejected';
     return { platform: 'x', status: 'failed', code, error: reason };
   }
@@ -325,7 +325,7 @@ export async function runWorker(rawInput) {
   const diagnostic = { stage: 'start', page: null };
   const onTerminate = () => {
     timedOut = true;
-    abort?.(new WorkerError('Postslap stopped the background X operation.', submitted ? 'unknown' : 'unavailable'));
+    abort?.(new WorkerError('Postslop stopped the background X operation.', submitted ? 'unknown' : 'unavailable'));
   };
   const failure = (message, code) => rawInput?.operation === 'status'
     ? { id: 'x', label: 'X', available: false, code, reason: message }
@@ -337,10 +337,10 @@ export async function runWorker(rawInput) {
     await chmod(input.profilePath, 0o700);
     unlock = await lockProfile(input.profilePath);
     if (input.operation === 'publish' && !input.prepareOnly) {
-      journalPath = join(input.profilePath, 'postslap-requests', `${input.requestId}.json`);
+      journalPath = join(input.profilePath, 'postslop-requests', `${input.requestId}.json`);
       const previous = await readJson(journalPath);
       if (previous?.result) return previous.result;
-      if (previous?.submitted) return { platform: 'x', status: 'unknown', code: 'unknown', error: 'This request was already submitted to X without a confirmed outcome. Check your X profile; Postslap will not submit it twice.' };
+      if (previous?.submitted) return { platform: 'x', status: 'unknown', code: 'unknown', error: 'This request was already submitted to X without a confirmed outcome. Check your X profile; Postslop will not submit it twice.' };
     }
     const work = async () => {
       context = await firefox.launchPersistentContext(join(input.profilePath, 'firefox'), {
@@ -351,7 +351,7 @@ export async function runWorker(rawInput) {
       });
       if (timedOut) {
         await context.close();
-        throw new WorkerError('Postslap stopped before preparing the X post. Nothing was posted.');
+        throw new WorkerError('Postslop stopped before preparing the X post. Nothing was posted.');
       }
       context.setDefaultTimeout(12000);
       if (input.prepareOnly) await context.route(/\/graphql\/[^/]+\/CreateTweet(?:\?|$)/, (route) => {
@@ -375,8 +375,8 @@ export async function runWorker(rawInput) {
       deadline = setTimeout(() => {
         timedOut = true;
         reject(new WorkerError(submitted
-          ? 'Postslap timed out after submitting to X. Check your profile before trying again; this request will not be resubmitted.'
-          : 'Postslap’s background X operation timed out before submission. Nothing was posted.'));
+          ? 'Postslop timed out after submitting to X. Check your profile before trying again; this request will not be resubmitted.'
+          : 'Postslop’s background X operation timed out before submission. Nothing was posted.'));
       }, 80000);
     });
     const result = await Promise.race([work(), timeout]);
@@ -407,9 +407,9 @@ export async function runWorker(rawInput) {
       }).catch(() => {});
     }
     const message = error instanceof WorkerError ? error.message : submitted
-      ? 'Postslap lost confirmation after submitting to X. Check your profile before trying again; this request will not be resubmitted.'
-      : failureCode === 'composer_unavailable' ? 'Postslap could not prepare X’s composer. Nothing was posted.'
-      : 'Postslap could not complete the background X operation. Nothing was posted. Check that the browser worker is installed and X accepts your session.';
+      ? 'Postslop lost confirmation after submitting to X. Check your profile before trying again; this request will not be resubmitted.'
+      : failureCode === 'composer_unavailable' ? 'Postslop could not prepare X’s composer. Nothing was posted.'
+      : 'Postslop could not complete the background X operation. Nothing was posted. Check that the browser worker is installed and X accepts your session.';
     if (!(error instanceof WorkerError)) process.stderr.write(`X worker stopped (${error?.name ?? 'Error'}).\n`);
     return failure(message, failureCode);
   } finally {
@@ -420,7 +420,7 @@ export async function runWorker(rawInput) {
   }
 }
 
-// Shared only with Postslap's local, read-only published-post verifier.
+// Shared only with Postslop's local, read-only published-post verifier.
 export { lockProfile, importSession, signedInAccount };
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -434,8 +434,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.stdout.write(`${JSON.stringify(result)}\n`, () => process.exit(0));
   };
   const hardDeadline = setTimeout(() => respond(operation === 'status'
-    ? { id: 'x', label: 'X', available: false, code: 'unavailable', reason: 'Postslap’s background X check timed out.' }
-    : { platform: 'x', status: 'unknown', code: 'unknown', error: 'Postslap could not confirm the X result before its deadline. Check your profile before trying again.' }), 88000);
+    ? { id: 'x', label: 'X', available: false, code: 'unavailable', reason: 'Postslop’s background X check timed out.' }
+    : { platform: 'x', status: 'unknown', code: 'unknown', error: 'Postslop could not confirm the X result before its deadline. Check your profile before trying again.' }), 88000);
   try {
     process.stdin.setEncoding('utf8');
     for await (const chunk of process.stdin) {
@@ -446,6 +446,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     operation = input.operation;
     respond(await runWorker(input));
   } catch {
-    respond({ platform: 'x', status: 'failed', code: 'invalid_request', error: 'Postslap received an invalid X worker request.' });
+    respond({ platform: 'x', status: 'failed', code: 'invalid_request', error: 'Postslop received an invalid X worker request.' });
   }
 }

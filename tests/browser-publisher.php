@@ -19,10 +19,10 @@ function browser_check(bool $condition, string $message): void
     }
 }
 
-$configuredNode = getenv('POSTSLAP_NODE_BINARY');
+$configuredNode = getenv('POSTSLOP_NODE_BINARY');
 $node = $configuredNode === false || $configuredNode === '' ? '/opt/homebrew/bin/node' : $configuredNode;
-browser_check(is_executable($node), 'Set POSTSLAP_NODE_BINARY to the installed Node executable.');
-$directory = sys_get_temp_dir() . '/postslap-browser-' . bin2hex(random_bytes(6));
+browser_check(is_executable($node), 'Set POSTSLOP_NODE_BINARY to the installed Node executable.');
+$directory = sys_get_temp_dir() . '/postslop-browser-' . bin2hex(random_bytes(6));
 $sessions = new SessionStore($directory);
 $sessions->write('x', ['cookies' => []]);
 PrivateFiles::json($directory . '/manifest.json', ['accounts' => ['x' => ['handle' => '@tester']]]);

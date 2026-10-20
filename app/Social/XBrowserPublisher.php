@@ -10,7 +10,7 @@ final readonly class XBrowserPublisher implements Publisher
 {
     private XBrowserProcess $worker;
 
-    // Paths are explicit so the worker can only receive Postslap's imported session and dedicated profile.
+    // Paths are explicit so the worker can only receive Postslop's imported session and dedicated profile.
     // @mago-expect lint:excessive-parameter-list
     public function __construct(
         private SessionStore $sessions,
@@ -138,17 +138,17 @@ final readonly class XBrowserPublisher implements Publisher
                 => 'The saved X session is signed out or expired. Import your signed-in session again.',
             'account_mismatch'
                 => 'The saved X session does not match the intended account. Import the correct account again.',
-            'challenge' => 'X requires an account check before Postslap can publish. No post was submitted.',
-            'busy' => 'Postslap is already checking or publishing to X. Try again shortly.',
+            'challenge' => 'X requires an account check before Postslop can publish. No post was submitted.',
+            'busy' => 'Postslop is already checking or publishing to X. Try again shortly.',
             'image_failed' => 'X could not finish attaching the image. No post was submitted.',
             'composer_unavailable'
                 => 'X’s composer could not be prepared. Your draft is saved and no post was submitted.',
             'rejected' => 'X rejected this post. Keep the draft and check the account before trying again.',
             'automation_rejected'
-                => 'X rejected this post as suspected automation (code 226). Postslap stopped without retrying.',
+                => 'X rejected this post as suspected automation (code 226). Postslop stopped without retrying.',
             'rate_limited'
                 => 'X rejected this request with its posting-limit error (code 344). Keep the draft and try later.',
-            default => 'Postslap could not verify its background X session. Check the connection or import the session again.',
+            default => 'Postslop could not verify its background X session. Check the connection or import the session again.',
         };
     }
 
@@ -157,7 +157,7 @@ final readonly class XBrowserPublisher implements Publisher
         return [
             'platform' => 'x',
             'status' => 'unknown',
-            'error' => 'X did not confirm the post. Check your profile before posting again; Postslap will not retry automatically.',
+            'error' => 'X did not confirm the post. Check your profile before posting again; Postslop will not retry automatically.',
         ];
     }
 }

@@ -20,7 +20,7 @@ function review_check(bool $condition, string $message): void
     }
 }
 
-$directory = sys_get_temp_dir() . '/postslap-review-' . bin2hex(random_bytes(6));
+$directory = sys_get_temp_dir() . '/postslop-review-' . bin2hex(random_bytes(6));
 $sessions = new SessionStore($directory . '/sessions');
 $sessions->write('dev-null', [
     'cookies' => [[

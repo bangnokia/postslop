@@ -10,11 +10,11 @@ import test from 'node:test';
 import { runWorker } from '../x-worker.mjs';
 import { xFixture } from './fixture.mjs';
 
-process.env.POSTSLAP_TEST_MODE = '1';
+process.env.POSTSLOP_TEST_MODE = '1';
 const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB1cAAAAASUVORK5CYII=', 'base64');
 
 async function withFixture(options, callback) {
-  const directory = await mkdtemp(join(tmpdir(), 'postslap-worker-'));
+  const directory = await mkdtemp(join(tmpdir(), 'postslop-worker-'));
   const fixture = xFixture(options);
   const server = createServer(fixture.handler);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -45,8 +45,8 @@ test('publishes text, clipboard image bytes and alt text through the browser exa
     assert.deepEqual(await runWorker(input), result);
     assert.equal(fixture.posts.length, 1);
     assert.equal((await stat(input.profilePath)).mode & 0o777, 0o700);
-    assert.equal((await stat(join(input.profilePath, 'postslap-session.json'))).mode & 0o777, 0o600);
-    const journal = JSON.parse(await readFile(join(input.profilePath, 'postslap-requests', `${input.requestId}.json`), 'utf8'));
+    assert.equal((await stat(join(input.profilePath, 'postslop-session.json'))).mode & 0o777, 0o600);
+    const journal = JSON.parse(await readFile(join(input.profilePath, 'postslop-requests', `${input.requestId}.json`), 'utf8'));
     assert.equal(journal.submitted, true);
   });
 });
@@ -55,7 +55,7 @@ test('prepareOnly fills the composer but cannot click Post or create a submissio
   await withFixture({}, async (input, fixture) => {
     assert.equal((await runWorker({ ...input, prepareOnly: true })).status, 'prepared');
     assert.equal(fixture.posts.length, 0);
-    await assert.rejects(stat(join(input.profilePath, 'postslap-requests')), { code: 'ENOENT' });
+    await assert.rejects(stat(join(input.profilePath, 'postslop-requests')), { code: 'ENOENT' });
     assert.equal((await stat(join(input.profilePath, 'last-prepared.png'))).mode & 0o777, 0o600);
   });
 });
@@ -66,7 +66,7 @@ test('CLI preserves an emoji split between UTF-8 stdin chunks', async () => {
     const payload = Buffer.from(JSON.stringify({ ...input, text }));
     const split = payload.indexOf(Buffer.from('🦀')) + 2;
     const child = spawn(process.execPath, [fileURLToPath(new URL('../x-worker.mjs', import.meta.url))], {
-      env: { ...process.env, POSTSLAP_TEST_MODE: '1' }, stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, POSTSLOP_TEST_MODE: '1' }, stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '';
     child.stdout.setEncoding('utf8');

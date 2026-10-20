@@ -24,32 +24,32 @@ final class AppProvider implements Provider
     {
         $container->singleton(
             LocalToken::class,
-            static fn(): LocalToken => new LocalToken(config('postslap.token_path')),
+            static fn(): LocalToken => new LocalToken(config('postslop.token_path')),
         );
         $container->singleton(
             SessionStore::class,
-            static fn(): SessionStore => new SessionStore(config('postslap.sessions_path')),
+            static fn(): SessionStore => new SessionStore(config('postslop.sessions_path')),
         );
         $container->singleton(Publishing::class, static function (Container $container): Publishing {
             $http = $container->get(Client::class);
             $sessions = $container->get(SessionStore::class);
-            $x = match (config('postslap.x_transport')) {
+            $x = match (config('postslop.x_transport')) {
                 'browser' => new XBrowserPublisher(
                     $sessions,
-                    config('postslap.node_binary'),
-                    config('postslap.x_browser_worker'),
-                    config('postslap.sessions_path') . '/x.json',
-                    config('postslap.x_browser_profile'),
-                    baseUrl: config('postslap.x_url'),
+                    config('postslop.node_binary'),
+                    config('postslop.x_browser_worker'),
+                    config('postslop.sessions_path') . '/x.json',
+                    config('postslop.x_browser_profile'),
+                    baseUrl: config('postslop.x_url'),
                 ),
                 'http' => new XPublisher($http, $sessions),
-                default => throw new \LogicException('POSTSLAP_X_TRANSPORT must be browser or http.'),
+                default => throw new \LogicException('POSTSLOP_X_TRANSPORT must be browser or http.'),
             };
             return new Publishing([
                 'x' => $x,
                 'bluesky' => new BlueskyPublisher($http, $sessions),
                 'dev-null' => new DevNullPublisher($http, $sessions),
-            ], config('postslap.posts_path'));
+            ], config('postslop.posts_path'));
         });
     }
 }

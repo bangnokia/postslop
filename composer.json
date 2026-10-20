@@ -1,10 +1,10 @@
 {
-    "name": "postslap/postslap",
+    "name": "postslop/postslop",
     "description": "A local social publishing workspace built on CrabPHP",
     "type": "project",
     "require": {
         "php": "^8.4",
-        "crabphp/framework": "@dev"
+        "crabphp/framework": "dev-main"
     },
     "require-dev": {
         "carthage-software/mago": "1.57.0"
@@ -21,11 +21,8 @@
     },
     "repositories": [
         {
-            "type": "path",
-            "url": "../framework",
-            "options": {
-                "symlink": true
-            }
+            "type": "vcs",
+            "url": "https://github.com/crabphp/framework"
         }
     ],
     "minimum-stability": "dev",

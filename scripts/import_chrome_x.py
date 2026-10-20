@@ -2,7 +2,7 @@
 """Capture Chrome Default's X session as a private, unverified candidate.
 
 No network requests, browser changes, or publishing. Verify the expected account
-over HTTP before activating storage/sessions/x-chrome.json as Postslap's session.
+over HTTP before activating storage/sessions/x-chrome.json as Postslop's session.
 Only X cookies are decrypted; no Keychain or cookie values are printed.
 """
 

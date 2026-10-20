@@ -1,6 +1,6 @@
 version: 1
-name: Postslap x website fixture
-slug: postslap-x
+name: Postslop x website fixture
+slug: postslop-x
 protocol: http
 interceptRequests: true
 scenarios:

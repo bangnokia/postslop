@@ -1,10 +1,10 @@
-# Postslap
+# Postslop
 
-Write once and publish text and images to **X, Bluesky, and dev-null.sh** using your existing browser sessions. Postslap runs locally on [CrabPHP](../framework); it does not need developer API keys.
+Write once and publish text and images to **X, Bluesky, and dev-null.sh** using your existing browser sessions. Postslop runs locally on [CrabPHP](https://github.com/crabphp/framework); it does not need developer API keys.
 
 ## Raycast
 
-The **Postslap** extension keeps composing, attachments, publishing, and results inside Raycast:
+The **Postslop** extension keeps composing, attachments, publishing, and results inside Raycast:
 
 - Write in the multiline textarea and choose destinations.
 - **⌘⇧V** attaches an image from the clipboard; the Images field also accepts files.
@@ -12,7 +12,7 @@ The **Postslap** extension keeps composing, attachments, publishing, and results
 - **⌘Enter** hands off publishing to a background command and closes Raycast. A brief completion toast/HUD reports the result; full success clears the composer and failures retain the draft.
 - Drafts survive leaving the command. The local API server starts automatically if needed.
 
-See [the extension's local installation and usage guide](raycast/README.md). A background helper processes images without opening a separate app window. The web composer remains available alongside Raycast; both use the same Postslap API.
+See [the extension's local installation and usage guide](raycast/README.md). A background helper processes images without opening a separate app window. The web composer remains available alongside Raycast; both use the same Postslop API.
 
 ## Web composer
 
@@ -24,7 +24,7 @@ Both composers support up to four images, or three when dev-null.sh is selected.
 
 ## Run locally
 
-Requires PHP 8.4+, Composer, and the framework at `../framework`. Image inspection needs PHP `fileinfo` and `gd`; the Raycast composer additionally needs Raycast, Node, and the Swift command-line compiler on macOS.
+Requires PHP 8.4+ and Composer. Composer installs CrabPHP from GitHub at the exact commit recorded in `composer.lock`; the dependency uses `dev-main` until a tagged release is available. Image inspection needs PHP `fileinfo` and `gd`; the Raycast composer additionally needs Raycast, Node, and the Swift command-line compiler on macOS.
 
 ```sh
 set -e
@@ -37,7 +37,7 @@ php cua serve
 
 The server binds to `127.0.0.1:8087`. Use `php cua serve --daemon` to run it in the background, `php cua reload` after backend changes, and `php cua stop` to stop it. Logs are in `storage/logs/server.log`. The health endpoint is `/up`.
 
-X publishing uses Postslap's background browser worker. Install its pinned dependencies and private browser runtime once:
+X publishing uses Postslop's background browser worker. Install its pinned dependencies and private browser runtime once:
 
 ```sh
 cd browser-worker
@@ -61,11 +61,11 @@ python3 scripts/import_firefox_sessions.py \
 
 `--check-only` checks capture without exporting. The importer reads stable private SQLite snapshots, including committed WAL data, without closing Firefox. It imports only the three sites, skips partitioned/container cookies and X's multiple-account cookie, and keeps only the active Bluesky account.
 
-X imports cookies into the app-owned headless browser. Dev-null.sh uses cookies and CSRF headers through Crab's HTTP client. Bluesky keeps its active session tokens in browser localStorage; Postslap refreshes those tokens when necessary. The adapters verify the account against the imported handle before posting. X's website constructs its posting request; dev-null.sh uses its current Inertia form and image-upload behavior.
+X imports cookies into the app-owned headless browser. Dev-null.sh uses cookies and CSRF headers through Crab's HTTP client. Bluesky keeps its active session tokens in browser localStorage; Postslop refreshes those tokens when necessary. The adapters verify the account against the imported handle before posting. X's website constructs its posting request; dev-null.sh uses its current Inertia form and image-upload behavior.
 
 Sessions expire and websites change. An unavailable account shows a reason; reimport the session when necessary. The UI never treats a cookie file's existence as proof of a working sign-in.
 
-X can accept a session for account checks while rejecting a publishing request. Error 226 is an explicit automation rejection; error 344 is reported by X as an action limit and is not, by itself, proof that an account-wide daily quota was exhausted. Postslap preserves the draft and the failed result, and does not retry automatically or switch to manual browser posting. The former HTTP-only X adapter remains available with `POSTSLAP_X_TRANSPORT=http` for explicit diagnostics and its existing fixtures; it is never an automatic fallback.
+X can accept a session for account checks while rejecting a publishing request. Error 226 is an explicit automation rejection; error 344 is reported by X as an action limit and is not, by itself, proof that an account-wide daily quota was exhausted. Postslop preserves the draft and the failed result, and does not retry automatically or switch to manual browser posting. The former HTTP-only X adapter remains available with `POSTSLOP_X_TRANSPORT=http` for explicit diagnostics and its existing fixtures; it is never an automatic fallback.
 
 For a separately verified Chrome Default session on this Mac, `scripts/import_chrome_x.py --profile '/absolute/path/to/Chrome/Default' --expected-handle YOUR_X_HANDLE` writes only a private `storage/sessions/x-chrome.json` candidate. It reads the narrowly scoped X cookies using Chrome's existing Keychain entry. The candidate must be checked against the intended account over HTTP before it replaces the active session. Importing a session does not establish that X will accept writes.
 
