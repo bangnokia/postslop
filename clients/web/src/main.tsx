@@ -1,54 +1,79 @@
-import { StrictMode, useState, type FormEvent } from "react";
-import { ApiError, signIn, storedToken } from "./api";
+import { StrictMode, useEffect, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
+import { ApiError, signIn, storedToken } from "./api";
 import { AccountsPage } from "./pages/AccountsPage";
-import { Compose } from "./pages/Compose";
+import { Calendar } from "./pages/Calendar";
+import { Composer, ComposePage } from "./pages/Compose";
 import { PostDetail } from "./pages/PostDetail";
 import { Posts } from "./pages/Posts";
-import { useAccounts, useRoute } from "./ui";
+import { ShellProvider, Sidebar, Toasts, useShellState } from "./shell";
+import { Drawer, Modal, useAccounts, useRoute, useTheme } from "./ui";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
-import "./styles.css";
+import "./styles/tokens.css";
+import "./styles/base.css";
+import "./styles/layout.css";
+import "./styles/posts.css";
+import "./styles/calendar.css";
+import "./styles/compose.css";
+import "./styles/accounts.css";
 
 function App() {
   const [page, id, filter] = useRoute();
   const accounts = useAccounts();
-  const ready = accounts.accounts?.platforms.filter((account) => account.available).length;
-  const section = page === "posts" ? "posts" : page === "accounts" ? "accounts" : "compose";
+  const state = useShellState();
+  const [menu, setMenu] = useState(false);
+  useTheme();
+  const section = page === "posts" || page === "accounts" || page === "compose" ? page : "calendar";
+
+  // A link to one post opens it in the drawer over the posts.
+  const linked = page === "posts" && id && id !== "filter" ? id : undefined;
+  useEffect(() => {
+    if (linked) state.shell.openPost(linked);
+  }, [linked]);
+
+  // C starts a new post from anywhere outside a text field.
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (event.key.toLowerCase() !== "c" || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (target.closest("input, textarea, select, [contenteditable]") || document.querySelector(".layer")) return;
+      event.preventDefault();
+      state.shell.compose();
+    };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, []);
 
   return (
-    <div className="workspace">
-      <header className="site-header">
-        <a className="brand" href="#/" aria-label="Postslop home">
-          <span className="brand-mark" aria-hidden="true">
-            <span />
-            <span />
-          </span>
-          postslop<span className="brand-period">.</span>
-        </a>
-        <nav className="main-nav" aria-label="Postslop">
-          <a href="#/" aria-current={section === "compose" ? "page" : undefined}>
-            Compose
-          </a>
-          <a href="#/posts" aria-current={section === "posts" ? "page" : undefined}>
-            Posts
-          </a>
-          <a href="#/accounts" aria-current={section === "accounts" ? "page" : undefined}>
-            Accounts
-            <span className="account-dot" data-ready={ready === 3} title={accounts.accounts ? `${ready} of 3 accounts ready` : "Checking accounts"} />
-          </a>
-        </nav>
-      </header>
-      <main>
-        {section === "compose" && <Compose key={id ?? "new"} editing={page === "compose" ? id : undefined} accounts={accounts} />}
-        {section === "posts" && (id === "filter" ? <Posts filter={filter} /> : id ? <PostDetail key={id} id={id} /> : <Posts />)}
-        {section === "accounts" && <AccountsPage accounts={accounts} />}
-      </main>
-      <footer className="workspace-footer">
-        <p>Write it once. Put it out there.</p>
-        <span>Also from the terminal: postslop post "…"</span>
-      </footer>
-    </div>
+    <ShellProvider value={{ ...state.shell, openMenu: () => setMenu(true) }}>
+      <div className="app">
+        <Sidebar section={section} filter={page === "posts" && id === "filter" ? filter : undefined} accounts={accounts} open={menu} onClose={() => setMenu(false)} />
+        <main className="main">
+          {section === "calendar" && <Calendar view={id === "week" ? "week" : "month"} />}
+          {section === "compose" && <ComposePage key={id ?? "new"} editing={id} accounts={accounts} />}
+          {section === "posts" && <Posts filter={id === "filter" ? filter : undefined} />}
+          {section === "accounts" && <AccountsPage accounts={accounts} />}
+        </main>
+      </div>
+      {state.openPost && (
+        <Drawer
+          title="Post"
+          onClose={() => {
+            state.closePost();
+            if (linked) window.location.hash = "#/posts";
+          }}
+        >
+          <PostDetail key={state.openPost} id={state.openPost} onClose={state.closePost} />
+        </Drawer>
+      )}
+      {state.composing && (
+        <Modal title={state.composing.editing ? "Edit post" : "New post"} onClose={state.closeCompose}>
+          <Composer editing={state.composing.editing} at={state.composing.at} accounts={accounts} onDone={state.closeCompose} />
+        </Modal>
+      )}
+      <Toasts toasts={state.toasts} dismiss={state.dismiss} />
+    </ShellProvider>
   );
 }
 
@@ -57,6 +82,7 @@ function SignIn() {
   const [token, setToken] = useState("");
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  useTheme();
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
@@ -73,25 +99,48 @@ function SignIn() {
     }
   };
   return (
-    <div className="workspace">
-      <main className="page sign-in">
-        <h1>Sign in to postslop<span className="brand-period">.</span></h1>
-        <form onSubmit={submit}>
-          <label htmlFor="token">Access token</label>
-          <input id="token" type="password" autoComplete="current-password" autoFocus required value={token} onChange={(event) => setToken(event.target.value)} />
-          <button className="publish-button" data-ready={token.trim() !== "" && !busy} disabled={token.trim() === "" || busy} type="submit">
-            Sign in
-          </button>
-        </form>
-        {error && <p className="sign-in-error">{error}</p>}
-        <p className="hint">It is POSTSLOP_TOKEN in server/.env on the machine running Postslop.</p>
-      </main>
-    </div>
+    <main className="sign-in">
+      <form className="card sign-in-card" onSubmit={submit}>
+        <span className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            <span />
+            <span />
+          </span>
+          postslop<span className="brand-period">.</span>
+        </span>
+        <div>
+          <h1>Sign in</h1>
+          <p className="muted">Enter the access token, POSTSLOP_TOKEN in server/.env on the machine running Postslop.</p>
+        </div>
+        <div>
+          <label className="label" htmlFor="token">
+            Access token
+          </label>
+          <input id="token" className="input" type="password" autoComplete="current-password" autoFocus required value={token} onChange={(event) => setToken(event.target.value)} />
+        </div>
+        {error && <p className="error-text">{error}</p>}
+        <button className="btn btn-primary btn-block" disabled={token.trim() === "" || busy} type="submit">
+          {busy ? "Checking…" : "Sign in"}
+        </button>
+      </form>
+    </main>
   );
+}
+
+// Without POSTSLOP_TOKEN the server is open, so sign-in is asked for only when the API refuses this browser.
+function Gate() {
+  const [open, setOpen] = useState<boolean>();
+  useEffect(() => {
+    fetch("/api/v1/posts?limit=1", { headers: { Authorization: `Bearer ${storedToken()}`, Accept: "application/json" } })
+      .then((response) => setOpen(response.status !== 401))
+      .catch(() => setOpen(true));
+  }, []);
+  if (open === undefined) return null;
+  return open ? <App /> : <SignIn />;
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {storedToken() ? <App /> : <SignIn />}
+    <Gate />
   </StrictMode>,
 );

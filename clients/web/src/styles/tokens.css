@@ -1,0 +1,154 @@
+/*
+ * Design tokens. Every colour, size and motion value the client uses is named here; components read only these.
+ * Light is the default. Dark follows the system unless the sidebar toggle picks one (html[data-theme]).
+ */
+:root {
+  color-scheme: light;
+
+  /* Surfaces and text */
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f1f1ee;
+  --surface-3: #e9e9e5;
+  --border: #e4e4df;
+  --border-strong: #d4d4cd;
+  --text: #18181b;
+  --text-2: #5f5f66;
+  --text-3: #8e8e96;
+  --overlay: rgb(24 24 27 / 0.42);
+
+  /* One accent, for primary actions, focus and today */
+  --accent: #e2582a;
+  --accent-hover: #c94a1f;
+  --accent-soft: #fdeee7;
+  --accent-text: #ffffff;
+
+  /* Status: a soft background and a readable foreground each */
+  --draft-bg: #efeff0;
+  --draft-fg: #55555c;
+  --scheduled-bg: #e8effd;
+  --scheduled-fg: #2c58b8;
+  --progress-bg: #fdf3dc;
+  --progress-fg: #9a6400;
+  --published-bg: #e3f4e8;
+  --published-fg: #1d7a3d;
+  --failed-bg: #fde8e4;
+  --failed-fg: #b42d1a;
+
+  /* Platforms */
+  --x: #000000;
+  --bluesky: #1185fe;
+  --dev-null-ink: #121417;
+  --dev-null: #d9480f;
+
+  /* Type */
+  --font: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+
+  /* Space, on a 4px scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Shape and depth */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgb(24 24 27 / 0.06), 0 1px 3px rgb(24 24 27 / 0.04);
+  --shadow-md: 0 4px 12px rgb(24 24 27 / 0.08);
+  --shadow-lg: 0 16px 48px rgb(24 24 27 / 0.18);
+
+  /* Layout and motion */
+  --sidebar: 248px;
+  --header: 64px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --fast: 120ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f1012;
+    --surface: #17181b;
+    --surface-2: #1f2024;
+    --surface-3: #2a2b30;
+    --border: #2a2c31;
+    --border-strong: #3a3c42;
+    --text: #ececec;
+    --text-2: #a1a1aa;
+    --text-3: #71717a;
+    --overlay: rgb(0 0 0 / 0.6);
+    --accent: #ff7a45;
+    --accent-hover: #ff9466;
+    --accent-soft: #3a1f14;
+    --accent-text: #170b05;
+    --draft-bg: #26272b;
+    --draft-fg: #b4b4bb;
+    --scheduled-bg: #18264a;
+    --scheduled-fg: #8fb0ff;
+    --progress-bg: #3a2c0c;
+    --progress-fg: #f0c25a;
+    --published-bg: #12321e;
+    --published-fg: #6fd896;
+    --failed-bg: #3d1712;
+    --failed-fg: #ff8b78;
+    --x: #ffffff;
+    --dev-null-ink: #ececec;
+    --dev-null: #ff8a4c;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 12px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.6);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1012;
+  --surface: #17181b;
+  --surface-2: #1f2024;
+  --surface-3: #2a2b30;
+  --border: #2a2c31;
+  --border-strong: #3a3c42;
+  --text: #ececec;
+  --text-2: #a1a1aa;
+  --text-3: #71717a;
+  --overlay: rgb(0 0 0 / 0.6);
+  --accent: #ff7a45;
+  --accent-hover: #ff9466;
+  --accent-soft: #3a1f14;
+  --accent-text: #170b05;
+  --draft-bg: #26272b;
+  --draft-fg: #b4b4bb;
+  --scheduled-bg: #18264a;
+  --scheduled-fg: #8fb0ff;
+  --progress-bg: #3a2c0c;
+  --progress-fg: #f0c25a;
+  --published-bg: #12321e;
+  --published-fg: #6fd896;
+  --failed-bg: #3d1712;
+  --failed-fg: #ff8b78;
+  --x: #ffffff;
+  --dev-null-ink: #ececec;
+  --dev-null: #ff8a4c;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --fast: 0ms;
+  }
+}

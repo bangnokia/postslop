@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
-import { api, PLATFORM_NAMES, type Post } from "../api";
+import { api, inFlight, PLATFORM_NAMES, postTime, type Post } from "../api";
+import { Icon } from "../components/icons";
 import { toIso, toLocalInput, when } from "../compose";
-import { go, MediaThumb, Results, StatusBadge } from "../ui";
+import { useShell } from "../shell";
+import { MediaThumb, postsChanged, Results, StatusBadge, usePolling } from "../ui";
 
-export function PostDetail({ id }: { id: string }) {
+// One post, shown in the drawer over whichever page is open.
+export function PostDetail({ id, onClose }: { id: string; onClose: () => void }) {
+  const shell = useShell();
   const [post, setPost] = useState<Post>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -24,13 +28,18 @@ export function PostDetail({ id }: { id: string }) {
     };
   }, [id]);
 
-  async function act(action: () => Promise<Post | void>, after?: () => void) {
+  usePolling(Boolean(post && inFlight(post)), () => {
+    api.post(id).then(setPost).catch(() => {});
+  });
+
+  async function act(action: () => Promise<Post | void>, after?: (post: Post | void) => void) {
     setBusy(true);
     setError(undefined);
     try {
       const updated = await action();
       if (updated) setPost(updated);
-      after?.();
+      postsChanged();
+      after?.(updated);
     } catch (reason) {
       setError((reason as Error).message);
     } finally {
@@ -38,31 +47,23 @@ export function PostDetail({ id }: { id: string }) {
     }
   }
 
-  if (!post) return <section className="page">{error ? <p className="error">{error}</p> : <p className="loading">Loading…</p>}</section>;
+  if (!post) return error ? <p className="error-text">{error}</p> : <div className="detail-skeleton skeleton" />;
 
   const editable = post.status === "draft" || post.status === "scheduled";
   const failed = post.results.some((result) => result.status === "failed");
-  const recheck = post.status === "unknown" || post.status === "publishing";
   const future = time !== "" && new Date(time).getTime() > Date.now();
+  const at = postTime(post);
 
   return (
-    <section className="page" aria-labelledby="post-title">
-      <a className="back" href="#/posts">
-        ← Posts
-      </a>
-      <div className="page-heading">
-        <h1 id="post-title" className="visually-hidden">
-          Post
-        </h1>
+    <div className="detail">
+      <div className="detail-meta">
         <StatusBadge status={post.status} />
         <span className="muted">
-          {post.status === "scheduled" && post.scheduledAt ? `Publishes ${when(post.scheduledAt)}` : post.publishedAt ? `Published ${when(post.publishedAt)}` : `Written ${when(post.createdAt)}`}
-          {" · "}
-          {post.platforms.map((platform) => PLATFORM_NAMES[platform]).join(", ")}
+          {post.status === "scheduled" ? `Publishes ${when(at)}` : post.publishedAt ? `Published ${when(post.publishedAt)}` : post.status === "draft" ? `Edited ${when(post.updatedAt)}` : when(at)}
         </span>
       </div>
-      <article className="post-body">
-        <p>{post.text || <em>No text</em>}</p>
+      <article className="detail-body">
+        <p>{post.text || <em className="muted">No text</em>}</p>
         {post.images.length > 0 && (
           <div className="detail-images">
             {post.images.map((image) => (
@@ -74,52 +75,81 @@ export function PostDetail({ id }: { id: string }) {
           </div>
         )}
       </article>
-      <Results results={post.results} />
-      {error && <p className="error">{error}</p>}
-      <div className="detail-actions">
+      <section>
+        <h3 className="label">Destinations</h3>
+        {post.results.length > 0 ? (
+          <Results results={post.results} />
+        ) : (
+          <p className="muted">{post.platforms.map((platform) => PLATFORM_NAMES[platform]).join(", ")}</p>
+        )}
+      </section>
+      {editable && (
+        <section>
+          <h3 className="label">Schedule</h3>
+          <div className="detail-schedule">
+            <input className="input" type="datetime-local" aria-label="Publish at" value={time} min={toLocalInput(new Date().toISOString())} onChange={(event) => setTime(event.target.value)} />
+            <button type="button" className="btn btn-secondary" disabled={busy || !future} onClick={() => act(() => api.schedule(post.id, toIso(time)))}>
+              <Icon name="clock" /> {post.status === "scheduled" ? "Reschedule" : "Schedule"}
+            </button>
+          </div>
+          {post.status === "scheduled" && (
+            <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => act(() => api.schedule(post.id, null), () => setTime(""))}>
+              Move back to drafts
+            </button>
+          )}
+        </section>
+      )}
+      {error && <p className="error-text">{error}</p>}
+      {post.status === "unknown" && <p className="muted">Postslop never resends an unknown result. Check the account first: the post may already be live.</p>}
+      <footer className="detail-actions">
         {editable && (
           <>
-            <button type="button" className="publish-button" data-ready="true" disabled={busy} onClick={() => act(() => api.publish(post.id))}>
-              {busy ? "Working…" : "Publish now"} <span aria-hidden="true">↗</span>
-            </button>
-            <a className="clear-button" href={`#/compose/${post.id}`}>
-              Edit
-            </a>
-            <span className="schedule-inline">
-              <input type="datetime-local" aria-label="Publish at" value={time} min={toLocalInput(new Date().toISOString())} onChange={(event) => setTime(event.target.value)} />
-              <button type="button" className="clear-button" disabled={busy || !future} onClick={() => act(() => api.schedule(post.id, toIso(time)))}>
-                {post.status === "scheduled" ? "Reschedule" : "Schedule"}
-              </button>
-            </span>
-            {post.status === "scheduled" && (
-              <button type="button" className="clear-button" disabled={busy} onClick={() => act(() => api.schedule(post.id, null), () => setTime(""))}>
-                Unschedule
-              </button>
-            )}
             <button
               type="button"
-              className="clear-button danger"
+              className="btn btn-primary"
               disabled={busy}
+              onClick={() =>
+                act(
+                  () => api.publish(post.id),
+                  (updated) => updated && shell.track(updated),
+                )
+              }
+            >
+              <Icon name="send" /> Publish now
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
               onClick={() => {
-                if (window.confirm("Delete this post? It has not been sent anywhere.")) act(() => api.remove(post.id), () => go("/posts"));
+                onClose();
+                shell.compose({ editing: post.id });
               }}
             >
-              Delete
+              <Icon name="edit" /> Edit
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={busy}
+              onClick={() => {
+                if (window.confirm("Delete this post? It has not been sent anywhere.")) act(() => api.remove(post.id), onClose);
+              }}
+            >
+              <Icon name="trash" /> Delete
             </button>
           </>
         )}
         {failed && !editable && (
-          <button type="button" className="publish-button" data-ready="true" disabled={busy} onClick={() => act(() => api.retry(post.id))}>
-            {busy ? "Working…" : "Retry failed destinations"} <span aria-hidden="true">↗</span>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => act(() => api.retry(post.id))}>
+            <Icon name="refresh" /> {busy ? "Retrying…" : "Retry failed destinations"}
           </button>
         )}
-        {recheck && (
-          <button type="button" className="clear-button" disabled={busy} onClick={() => act(() => api.post(post.id))}>
-            Check result again
+        {post.status === "unknown" && (
+          <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => act(() => api.post(post.id))}>
+            <Icon name="refresh" /> Check again
           </button>
         )}
-      </div>
-      {post.status === "unknown" && <p className="hint">Postslop never resends an unknown result. Check the account first: the post may already be live.</p>}
-    </section>
+      </footer>
+    </div>
   );
 }

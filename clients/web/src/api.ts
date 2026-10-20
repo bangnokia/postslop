@@ -4,7 +4,13 @@ export type Platform = "x" | "bluesky" | "dev-null";
 export const PLATFORMS: Platform[] = ["x", "bluesky", "dev-null"];
 export const PLATFORM_NAMES: Record<Platform, string> = { x: "X", bluesky: "Bluesky", "dev-null": "dev-null.sh" };
 
-export type PostStatus = "draft" | "scheduled" | "publishing" | "published" | "partial" | "failed" | "unknown";
+export type PostStatus = "draft" | "scheduled" | "queued" | "publishing" | "published" | "partial" | "failed" | "unknown";
+
+// Handed to the server's queue and not settled yet: worth checking again shortly.
+export const inFlight = (post: Post) => post.status === "queued" || post.status === "publishing";
+
+// Where a post sits on the calendar: when it went out, else when it is due, else when it was last tried.
+export const postTime = (post: Post) => post.publishedAt ?? post.scheduledAt ?? post.updatedAt;
 
 export interface Account {
   id: Platform;
@@ -129,12 +135,14 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   accounts: (refresh = false) => call<Accounts>("GET", `/accounts${refresh ? "?refresh=1" : ""}`),
-  posts: (status: PostStatus[] = [], before?: string) => {
-    const query = new URLSearchParams({ limit: "20" });
+  posts: (status: PostStatus[] = [], before?: string, limit = 20) => {
+    const query = new URLSearchParams({ limit: String(limit) });
     if (status.length) query.set("status", status.join(","));
     if (before) query.set("before", before);
     return call<{ posts: Post[]; next: string | null }>("GET", `/posts?${query}`);
   },
+  // Posts on the calendar from one time up to another, soonest first; drafts are left out.
+  between: (from: Date, to: Date) => call<{ posts: Post[] }>("GET", `/posts?${new URLSearchParams({ from: from.toISOString(), to: to.toISOString() })}`).then((page) => page.posts),
   post: (id: string) => call<Post>("GET", `/posts/${id}`),
   create: (input: PostInput) => call<Post>("POST", "/posts", input),
   update: (id: string, input: PostInput) => call<Post>("PUT", `/posts/${id}`, input),

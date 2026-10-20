@@ -29,7 +29,7 @@ Requires PHP 8.4+ with `fileinfo` and `gd`, Composer, Node 22+ and Python 3. Com
 cd server
 composer install
 cp -n .env.example .env        # only on a new checkout
-php scripts/setup.php          # private storage, access token in .env, database
+php scripts/setup.php          # private storage and database; set POSTSLOP_TOKEN in .env
 cd browser-worker && npm ci && npm run setup && cd ..   # X's private headless browser
 bin/postslop setup             # import your signed-in sessions from Chrome
 ```
@@ -61,10 +61,12 @@ For scripts and agents, every command takes `--json` and prints exactly one JSON
 
 `postslop serve` (or `php cua serve --daemon` in `server/`) serves the built client at `SERVER_ADDRESS` (<http://127.0.0.1:8087> by default) and asks for the access token once:
 
-- **Compose**: per-site character counters, paste, drop or pick images with descriptions, publish now or schedule, and save drafts. The unsent draft, images included, is kept in this browser.
-- **Posts**: the history, filtered by scheduled, drafts, needs attention or published. Each post shows its result on each site, with links.
-- **Post**: edit, publish, reschedule or delete a draft. Retry only the failed destinations of a sent post.
-- **Accounts**: which sessions are ready, and why the others are not.
+- **Sidebar**: new post (or press <kbd>C</kbd>), the calendar, posts by status with counts, each account's state, and light, dark or system theme.
+- **Calendar**: a month grid and a week by the hour. Click a free day or hour to write a post scheduled for then; click a post to open it.
+- **Posts**: a grid of up to four columns, filtered by scheduled, drafts, needs attention or published, with search.
+- **Compose**: as a page or a modal over any page. Per-site character counters and previews, paste, drop or pick images with descriptions, publish now or schedule, and save drafts. Publishing hands the post to the queue at once; a toast reports the result. The unsent draft, images included, is kept in this browser.
+- **Post**: opens in a drawer. Edit, publish, reschedule or delete a draft; retry only the failed destinations of a sent post.
+- **Accounts**: which sessions are ready, why the others are not, and the technical details.
 
 Build it once, and again after changing it:
 
@@ -96,7 +98,7 @@ Each post's ID is its request ID, with a fingerprint of its content. Before cont
 
 ## Private local data
 
-`server/storage/`, `.env`, dependencies, the built web client and compiled helpers stay out of Git. The database, images and sessions have private permissions, in folders only you can read. Postslop can run on another machine and be reached from anywhere it listens (`SERVER_ADDRESS`). The HTTP API requires the access token, `POSTSLOP_TOKEN` in `server/.env`, as a bearer token and never serves private storage. The web client asks for that token once and keeps it in the browser; setup writes a random one, and you may set your own password there. Put HTTPS in front of it when it is reached over a network, since the token travels with every request. Raycast uses the CLI and needs no token.
+`server/storage/`, `.env`, dependencies, the built web client and compiled helpers stay out of Git. The database, images and sessions have private permissions, in folders only you can read. Postslop can run on another machine and be reached from anywhere it listens (`SERVER_ADDRESS`). The HTTP API requires the access token, `POSTSLOP_TOKEN` in `server/.env`, as a bearer token and never serves private storage. The web client asks for it once and keeps it in the browser. Leave it empty and the web client and API are open to anyone who can reach the server, which is only safe on a private network. Put HTTPS in front of it when it is reached over a network, since the token travels with every request. Raycast uses the CLI and needs no token.
 
 ## Checks
 
