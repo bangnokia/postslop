@@ -1,0 +1,21 @@
+# Postslap conventions
+
+- Use the user's local browser sessions for X, Bluesky, and dev-null.sh; do not require social API keys.
+- An explicit click on Publish submits immediately without a second confirmation once publishing is implemented.
+- After a fully successful publish, automatically clear the composer UI and saved draft, including text and attachments; retain drafts for failed or uncertain results.
+- All publishing and retries must run through Postslap; do not manually publish through Chrome or another site's composer.
+- Keep normal publishing inside Postslap/Raycast without opening visible browser windows; any background browser worker must be owned by the app.
+- Keep the Postslap composer entirely inside the Raycast extension; use its native controls and an explicit Paste Image action (⌘⇧V), without launching a separate macOS composer app.
+- Preserve drafts when publishing fails and clear them after full success in both clients.
+- Retain the web UI alongside the Raycast extension; both use the same Postslap API, with future server hosting in mind.
+- Keep the Raycast UI responsive: hand publishing to a background command, close the composer after handoff, and show brief completion HUD/toast feedback instead of requiring users to wait in Raycast.
+- Use the working native Raycast form with an attachment list below the textarea; image previews are not required in Raycast. Keep image thumbnails in the web composer.
+- Always open Raycast Postslap on a fresh New Post form by default; preserve earlier drafts and results in Saved Posts, including posts still publishing in the background.
+- Keep session values private, local, and uncommitted; store imported sessions only under `storage/sessions/` with restricted permissions.
+- Never commit or push keys, credentials, tokens, session data, or other secrets; audit staged files before committing and pushing.
+- Verify that credentials match the intended account and that sign-in succeeds before sharing credentials or submitting them for review.
+- Never write or run tests for database seeders.
+- Prefer the smallest change that fixes a proven cause; avoid speculative code.
+- Use the session's native computer-use tool for desktop inspection; do not launch Orca unless explicitly requested.
+- Share clean destination URLs; remove all `utm_*` parameters and do not add campaign tracking parameters.
+- Record durable user conventions here when they are missing and follow them immediately.

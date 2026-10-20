@@ -1,0 +1,9 @@
+version: 1
+name: Postslap bluesky website fixture
+slug: postslap-bluesky
+protocol: http
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

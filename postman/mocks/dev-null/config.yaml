@@ -1,0 +1,9 @@
+version: 1
+name: Postslap dev-null website fixture
+slug: postslap-dev-null
+protocol: http
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

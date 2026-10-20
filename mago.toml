@@ -1,0 +1,18 @@
+#:schema https://mago.carthage.software/1.57.0/schema.json
+version = "1"
+php-version = "8.4.0"
+
+[source]
+workspace = "."
+paths = ["app/", "config/", "routes/", "app.php", "cua"]
+includes = ["vendor"]
+excludes = ["vendor/**", "storage/**"]
+
+[formatter]
+print-width = 120
+
+[linter.rules]
+# Keep the framework skeleton's concise env(name, default) convention.
+literal-named-argument = { enabled = false }
+# The console route file is a required bootstrap entry point, ready for future commands.
+no-redundant-file = { enabled = false }
