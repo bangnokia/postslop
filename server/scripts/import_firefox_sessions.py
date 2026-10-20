@@ -253,14 +253,15 @@ def report(source: str, profile: Path, states: dict, accounts: dict) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", required=True, type=Path, help="Explicit Firefox profile directory")
-    parser.add_argument("--x-handle", required=True, help="X handle already verified in Firefox")
-    parser.add_argument("--bluesky-handle", required=True, help="Bluesky handle already verified in Firefox")
-    parser.add_argument("--dev-null-handle", required=True, help="dev-null.sh handle already verified in Firefox")
+    parser.add_argument("--x-handle", help="X handle already verified in Firefox; leave out to skip this site")
+    parser.add_argument("--bluesky-handle", help="Bluesky handle already verified in Firefox; leave out to skip this site")
+    parser.add_argument("--dev-null-handle", help="dev-null.sh handle already verified in Firefox; leave out to skip this site")
     arguments = parser.parse_args()
-    handles = {
-        "x": arguments.x_handle.lstrip("@"), "bluesky": arguments.bluesky_handle.lstrip("@"),
-        "dev-null": arguments.dev_null_handle.lstrip("@"),
-    }
+    # Only the sites given a handle are imported, so one account can be added or refreshed on its own.
+    given = {"x": arguments.x_handle, "bluesky": arguments.bluesky_handle, "dev-null": arguments.dev_null_handle}
+    handles = {platform: handle.lstrip("@") for platform, handle in given.items() if handle is not None}
+    if not handles:
+        parser.error("Give the handle of at least one site.")
     if not all(handle and all(character.isalnum() or character in "._-" for character in handle) for handle in handles.values()):
         parser.error("Expected handles must contain only letters, numbers, dots, underscores, or hyphens.")
     os.umask(0o077)
@@ -268,19 +269,22 @@ def main() -> int:
     accounts = {}
     with database_snapshot(arguments.profile / "cookies.sqlite") as connection:
         for platform, domain in DOMAINS.items():
+            if platform not in handles:
+                continue
             cookies, skipped = read_cookies(connection, domain)
             states[platform] = {"cookies": cookies, "origins": []}
             accounts[platform] = {
                 "handle": handles[platform], "cookieCount": len(cookies), "skippedCookies": skipped,
                 "localStorageCount": 0,
             }
-    if not {"auth_token", "ct0"}.issubset({cookie["name"] for cookie in states["x"]["cookies"]}):
+    if "x" in handles and not {"auth_token", "ct0"}.issubset({cookie["name"] for cookie in states["x"]["cookies"]}):
         raise ImportFailure("The selected Firefox profile has no usable persisted X sign-in.")
-    if not any(cookie["name"] == "devnull-session" or cookie["name"].startswith("remember_web_") for cookie in states["dev-null"]["cookies"]):
+    if "dev-null" in handles and not any(cookie["name"] == "devnull-session" or cookie["name"].startswith("remember_web_") for cookie in states["dev-null"]["cookies"]):
         raise ImportFailure("The selected Firefox profile has no usable persisted dev-null.sh sign-in.")
-    local_storage = read_bluesky_storage(arguments.profile, handles["bluesky"])
-    states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]
-    accounts["bluesky"]["localStorageCount"] = len(local_storage)
+    if "bluesky" in handles:
+        local_storage = read_bluesky_storage(arguments.profile, handles["bluesky"])
+        states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]
+        accounts["bluesky"]["localStorageCount"] = len(local_storage)
     report("firefox", arguments.profile, states, accounts)
     return 0
 

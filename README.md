@@ -12,13 +12,13 @@ Write once and publish text and images to **X, Bluesky and dev-null.sh** using t
  schedule ──▶ queue (postslop serve) ──┘
 ```
 
-One core holds every rule: drafts, scheduling, history, and never posting the same thing twice. It has two front doors. The **command line** runs the core directly, so Raycast and AI agents need no server running. The **HTTP API** serves the web client.
+One core holds every rule: drafts, scheduling, history, and never posting the same thing twice. It has two front doors. The **command line** runs the core directly, so Raycast and AI agents need no server running. The **HTTP API** serves the web client, and Raycast when Postslop runs on another machine.
 
 | Folder | What |
 | --- | --- |
 | `server/` | The core, the CLI, the HTTP API, the X browser worker, private storage |
 | `clients/web/` | The web client: Vite, React, TypeScript |
-| `clients/raycast/` | The Raycast extension, which calls the CLI |
+| `clients/raycast/` | The Raycast extension, which calls the CLI, or the API of a Postslop on a server |
 | `docs/` | [HTTP API](docs/api.md) and [testing against fake sites](docs/testing.md) |
 
 ## Install
@@ -40,6 +40,7 @@ To call it as `postslop` from anywhere, link it onto your path: `ln -s "$PWD/bin
 
 ```sh
 postslop accounts                          # which accounts are ready
+postslop accounts disable bluesky          # stop using one (enable turns it back on, remove forgets it)
 postslop post "Hello"                      # save a draft
 postslop post "Hello" --now                # publish now
 postslop post "Hello" --at="tomorrow 9am"  # schedule (local time)
@@ -79,11 +80,15 @@ npm run dev      # or work on it at http://127.0.0.1:5173 against the running se
 
 ## Raycast
 
-The **Postslop** extension composes inside Raycast. It runs the CLI, so it needs no server. Press ⌘⇧V to paste an image, and ⌘Enter to hand the post to a background command and close Raycast. A HUD reports the result. See [its guide](clients/raycast/README.md).
+The **Postslop** extension composes inside Raycast. It runs the local CLI, so it needs no server; or set its **Server URL** and **Access Token** preferences to post through a Postslop on another machine. Press ⌘⇧V to paste an image, and ⌘Enter to hand the post to a background command and close Raycast. A HUD reports the result. See [its guide](clients/raycast/README.md).
 
 ## Browser sessions
 
-`postslop setup` reads Chrome's last used profile, asks which account is signed in on each site, and saves only those three sites' sessions in one file, `server/storage/sessions.json`. Check the accounts in the browser first. Postslop refuses a session that belongs to another account than the handle you give. Chrome encrypts its cookies, so macOS asks once to let Postslop use "Chrome Safe Storage": choose Allow. `--browser=firefox` imports from Firefox's default profile instead, `--profile=DIR` picks another profile, and `--check-only` reads without saving.
+`postslop setup` reads Chrome's last used profile, asks which account is signed in on each site, and saves only those three sites' sessions in one file, `server/storage/sessions.json`. Check the accounts in the browser first. Postslop refuses a session that belongs to another account than the handle you give. Chrome encrypts its cookies, so macOS asks once to let Postslop use "Chrome Safe Storage": choose Allow. `--browser=firefox` imports from Firefox's default profile instead, `--profile=DIR` picks another profile, and `--check-only` reads without saving. Name sites, such as `postslop setup x`, to import only those.
+
+Postslop holds one account per site. `postslop accounts disable SITE` turns one off without forgetting it: the composer stops offering it and nothing is published to it. `enable` turns it back on and `remove` deletes its session; its posts stay in the history. The web client's Accounts page does the same.
+
+When Postslop runs on another machine, import on the computer with the browser and send the sessions there: `bin/postslop setup x --to=https://postslop.example.com --token=TOKEN`, where the token is that server's `POSTSLOP_TOKEN` (or set `POSTSLOP_REMOTE_TOKEN`). Nothing is saved locally. Sessions sign in as you, so `--to` needs https, except for localhost, a private network or Tailscale.
 
 Under the hood, `scripts/import_chrome_sessions.py` and `scripts/import_firefox_sessions.py` read the browser's files without closing it or changing anything, and make no network requests. They skip partitioned and container cookies and X's multiple-account cookie, and keep only the active Bluesky account. Chrome's Bluesky session is read from its localStorage LevelDB files.
 
@@ -98,7 +103,7 @@ Each post's ID is its request ID, with a fingerprint of its content. Before cont
 
 ## Private local data
 
-`server/storage/`, `.env`, dependencies, the built web client and compiled helpers stay out of Git. The database, images and sessions have private permissions, in folders only you can read. Postslop can run on another machine and be reached from anywhere it listens (`SERVER_ADDRESS`). The HTTP API requires the access token, `POSTSLOP_TOKEN` in `server/.env`, as a bearer token and never serves private storage. The web client asks for it once and keeps it in the browser. Leave it empty and the web client and API are open to anyone who can reach the server, which is only safe on a private network. Put HTTPS in front of it when it is reached over a network, since the token travels with every request. Raycast uses the CLI and needs no token.
+`server/storage/`, `.env`, dependencies, the built web client and compiled helpers stay out of Git. The database, images and sessions have private permissions, in folders only you can read. Postslop can run on another machine and be reached from anywhere it listens (`SERVER_ADDRESS`). The HTTP API requires the access token, `POSTSLOP_TOKEN` in `server/.env`, as a bearer token and never serves private storage. The web client asks for it once and keeps it in the browser. Leave it empty and the web client and API are open to anyone who can reach the server, which is only safe on a private network. Put HTTPS in front of it when it is reached over a network, since the token travels with every request. Raycast uses the CLI and needs no token, unless it is set to a server's URL.
 
 ## Checks
 

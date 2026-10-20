@@ -45,14 +45,14 @@ Times are UTC. A URL identifies an existing post on that site; it is never an in
 
 ## Accounts — `GET /api/v1/accounts`
 
-Read-only sign-in checks, cached for 30 seconds; `?refresh=1` checks again. Bluesky may refresh an expired access token with its saved refresh token. X is checked through the private background browser, which opens no window.
+Postslop holds one account per site. Sign-in checks are cached for 30 seconds; `?refresh=1` checks again. Bluesky may refresh an expired access token with its saved refresh token. X is checked through the private background browser, which opens no window.
 
 ```json
 {
   "platforms": [
-    {"id": "x", "label": "X", "available": true, "handle": "example", "maxImages": 4, "textLimit": 280},
-    {"id": "bluesky", "label": "Bluesky", "available": false, "handle": "example.test", "reason": "Import this session again.", "maxImages": 4, "textLimit": 300},
-    {"id": "dev-null", "label": "dev-null.sh", "available": true, "handle": "example", "maxImages": 3, "textLimit": 4000}
+    {"id": "x", "label": "X", "available": true, "handle": "example", "enabled": true, "connected": true, "importedAt": "2026-10-20T17:29:06Z", "source": "firefox", "maxImages": 4, "textLimit": 280},
+    {"id": "bluesky", "label": "Bluesky", "available": false, "handle": "example.test", "reason": "Turned off in Postslop.", "enabled": false, "connected": true, "importedAt": "2026-10-20T17:29:06Z", "source": "chrome", "maxImages": 4, "textLimit": 300},
+    {"id": "dev-null", "label": "dev-null.sh", "available": false, "handle": null, "reason": "Not connected. Run: postslop setup dev-null", "enabled": true, "connected": false, "importedAt": null, "source": null, "maxImages": 3, "textLimit": 4000}
   ],
   "limits": {"maxImages": 4, "maxImageBytes": 1048576},
   "publishingEnabled": true
@@ -60,6 +60,16 @@ Read-only sign-in checks, cached for 30 seconds; `?refresh=1` checks again. Blue
 ```
 
 Handles have no leading `@`. A platform can be unavailable even when session data exists; show `reason` and let the user pick other destinations. An optional `detail` holds technical information for diagnosing it, such as the background browser's own error, with secrets removed. `textLimit` is for counters; each publisher enforces its site's exact rule.
+
+`connected` says a session is saved. `enabled` is false for an account turned off in Postslop: it keeps its session, is not checked, and a post still addressed to it fails for that site with nothing sent. Offer only accounts that are connected and enabled.
+
+Each of these answers with the accounts, as `GET /api/v1/accounts?refresh=1` does:
+
+- `PATCH /api/v1/accounts/{site}` with `{"enabled": false}` turns an account off, `true` back on.
+- `DELETE /api/v1/accounts/{site}` forgets the account: its session and, for X, its background browser profile. Its posts stay.
+- `PUT /api/v1/accounts/{site}` with `{"handle": "example", "session": {"cookies": [...], "origins": [...]}, "source": "firefox"}` saves a session, turned on, and checks it signs in. `postslop setup --to=URL` sends this from the machine with the browser; clients do not build sessions themselves.
+
+`{site}` is `x`, `bluesky` or `dev-null`; another answers `404`.
 
 ## Write a post — `POST /api/v1/posts`
 

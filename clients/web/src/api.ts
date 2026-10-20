@@ -15,11 +15,17 @@ export const postTime = (post: Post) => post.publishedAt ?? post.scheduledAt ?? 
 export interface Account {
   id: Platform;
   label: string;
+  // Turned on in Postslop; a turned-off account keeps its session but is not offered or published to.
+  enabled: boolean;
+  // Has a saved browser session.
+  connected: boolean;
   available: boolean;
   handle?: string;
   reason?: string;
   // What went wrong underneath the reason, such as the background browser's own error.
   detail?: string;
+  importedAt?: string | null;
+  source?: string | null;
   maxImages: number;
   textLimit: number;
 }
@@ -135,6 +141,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   accounts: (refresh = false) => call<Accounts>("GET", `/accounts${refresh ? "?refresh=1" : ""}`),
+  setAccount: (id: Platform, enabled: boolean) => call<Accounts>("PATCH", `/accounts/${id}`, { enabled }),
+  removeAccount: (id: Platform) => call<Accounts>("DELETE", `/accounts/${id}`),
   posts: (status: PostStatus[] = [], before?: string, limit = 20) => {
     const query = new URLSearchParams({ limit: String(limit) });
     if (status.length) query.set("status", status.join(","));

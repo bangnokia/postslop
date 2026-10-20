@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { api, inFlight, PLATFORM_NAMES, PLATFORMS, signOut, storedToken, type Post, type PostStatus } from "./api";
 import { Icon, type IconName } from "./components/icons";
 import { FILTERS } from "./pages/Posts";
-import { PlatformIcon, postsChanged, usePolling, usePostsChanged, useTheme, type AccountState, type Theme } from "./ui";
+import { PlatformIcon, postsChanged, usePolling, usePostsChanged, usable, useTheme, type AccountState, type Theme } from "./ui";
 
 export interface Toast {
   id: number;
@@ -163,10 +163,10 @@ export function Sidebar({ section, filter, accounts, open, onClose }: { section:
           <ul className="sidebar-accounts">
             {PLATFORMS.map((platform) => {
               const account = accounts.accounts?.platforms.find((item) => item.id === platform);
-              const state = !account ? "checking" : account.available ? "ready" : "attention";
+              const state = !account ? "checking" : !usable(account) ? "off" : account.available ? "ready" : "attention";
               return (
                 <li key={platform}>
-                  <a href="#/accounts" onClick={onClose} title={account?.reason ?? (state === "ready" ? "Ready" : "Checking…")}>
+                  <a href="#/accounts" onClick={onClose} title={state === "off" ? (account?.connected ? "Turned off" : "Not connected") : (account?.reason ?? (state === "ready" ? "Ready" : "Checking…"))}>
                     <PlatformIcon platform={platform} size={16} />
                     <span className="sidebar-handle">{account?.handle ? `@${account.handle.replace(/^@/, "")}` : PLATFORM_NAMES[platform]}</span>
                     <span className="status-dot" data-state={state} aria-label={state} />

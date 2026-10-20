@@ -283,14 +283,15 @@ def default_profile() -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, help="Chrome profile directory (default: the last used profile)")
-    parser.add_argument("--x-handle", required=True, help="X handle already verified in Chrome")
-    parser.add_argument("--bluesky-handle", required=True, help="Bluesky handle already verified in Chrome")
-    parser.add_argument("--dev-null-handle", required=True, help="dev-null.sh handle already verified in Chrome")
+    parser.add_argument("--x-handle", help="X handle already verified in Chrome; leave out to skip this site")
+    parser.add_argument("--bluesky-handle", help="Bluesky handle already verified in Chrome; leave out to skip this site")
+    parser.add_argument("--dev-null-handle", help="dev-null.sh handle already verified in Chrome; leave out to skip this site")
     arguments = parser.parse_args()
-    handles = {
-        "x": arguments.x_handle.lstrip("@"), "bluesky": arguments.bluesky_handle.lstrip("@"),
-        "dev-null": arguments.dev_null_handle.lstrip("@"),
-    }
+    # Only the sites given a handle are imported, so one account can be added or refreshed on its own.
+    given = {"x": arguments.x_handle, "bluesky": arguments.bluesky_handle, "dev-null": arguments.dev_null_handle}
+    handles = {platform: handle.lstrip("@") for platform, handle in given.items() if handle is not None}
+    if not handles:
+        parser.error("Give the handle of at least one site.")
     if not all(handle and all(character.isalnum() or character in "._-" for character in handle) for handle in handles.values()):
         parser.error("Expected handles must contain only letters, numbers, dots, underscores, or hyphens.")
     if sys.platform != "darwin":
@@ -300,23 +301,27 @@ def main() -> int:
         raise ImportFailure(f"No Chrome profile with cookies at {profile}. Pass --profile=DIR.")
     os.umask(0o077)
     # Read localStorage first, so a missing Bluesky sign-in fails before the Keychain prompt.
-    local_storage = read_bluesky_storage(profile, handles["bluesky"])
+    local_storage = read_bluesky_storage(profile, handles["bluesky"]) if "bluesky" in handles else []
     states = {}
     accounts = {}
     with database_snapshot(profile / "Cookies") as connection:
         key = chrome_key()
         for platform, domain in DOMAINS.items():
+            if platform not in handles:
+                continue
             cookies, skipped = read_cookies(connection, key, domain)
             states[platform] = {"cookies": cookies, "origins": []}
             accounts[platform] = {
                 "handle": handles[platform], "cookieCount": len(cookies), "skippedCookies": skipped,
                 "localStorageCount": 0,
             }
-    require_x_sign_in(states["x"]["cookies"])
-    if not any(cookie["name"] == "devnull-session" or cookie["name"].startswith("remember_web_") for cookie in states["dev-null"]["cookies"]):
+    if "x" in handles:
+        require_x_sign_in(states["x"]["cookies"])
+    if "dev-null" in handles and not any(cookie["name"] == "devnull-session" or cookie["name"].startswith("remember_web_") for cookie in states["dev-null"]["cookies"]):
         raise ImportFailure("The selected Chrome profile has no usable persisted dev-null.sh sign-in.")
-    states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]
-    accounts["bluesky"]["localStorageCount"] = len(local_storage)
+    if "bluesky" in handles:
+        states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]
+        accounts["bluesky"]["localStorageCount"] = len(local_storage)
     report("chrome", profile, states, accounts)
     return 0
 

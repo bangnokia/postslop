@@ -15,9 +15,11 @@
 - Keep the Postslop composer entirely inside the Raycast extension; use its native controls and an explicit Paste Image action (⌘⇧V), without launching a separate macOS composer app.
 - Preserve drafts when publishing fails and clear them after full success in both clients.
 - Retain the web client alongside the Raycast extension; both go through the same core, with future server hosting in mind.
+- Raycast uses the local CLI by default, and the HTTP API of a Postslop on another machine when its Server URL and Access Token preferences are set; support both.
 - Keep the Raycast UI responsive: hand publishing to a background command, close the composer after handoff, and show brief completion HUD/toast feedback instead of requiring users to wait in Raycast.
 - Use the working native Raycast form with an attachment list below the textarea; image previews are not required in Raycast. Keep image thumbnails in the web composer.
 - Always open Raycast Postslop on a fresh New Post form by default; preserve earlier drafts and results in Saved Posts, including posts still publishing in the background.
+- Hold one account per site. Manage accounts through the core (turn on/off, remove, import); a remote Postslop receives sessions pushed from the user's computer with `postslop setup --to=URL`, never sent elsewhere.
 - Keep session values private, local, and uncommitted; store every account's handle and session in the one file `server/storage/sessions.json`, readable only by the user; the X background browser receives its cookies from Postslop and keeps only its profile folder.
 - Never commit or push keys, credentials, tokens, session data, or other secrets; audit staged files before committing and pushing.
 - Verify that credentials match the intended account and that sign-in succeeds before sharing credentials or submitting them for review.

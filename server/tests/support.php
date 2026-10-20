@@ -6,6 +6,7 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\Core\Publishing;
 use App\PrivateFiles;
+use App\Social\SessionStore;
 use Crab\App;
 use Crab\Contracts\Cache\Cache;
 use Crab\Contracts\Database\Database;
@@ -30,6 +31,12 @@ function test_app(string $directory): App
 
 function test_publishing(App $app, array $publishers, string $directory): Publishing
 {
+    // Each fake site counts as connected; the fakes never read the session.
+    $sessions = $app->container->get(SessionStore::class);
+    $sessions->import(array_map(
+        static fn(): array => ['handle' => 'fixture', 'session' => ['cookies' => [], 'origins' => []]],
+        $publishers,
+    ), 'test');
     return new Publishing(
         $publishers,
         $app->container->get(Database::class),
@@ -37,6 +44,7 @@ function test_publishing(App $app, array $publishers, string $directory): Publis
         $app->container->get(Queue::class),
         $directory . '/publishing.lock',
         $directory . '/media',
+        $sessions,
     );
 }
 

@@ -111,10 +111,34 @@ try {
     api_check(array_column($range['posts'], 'id') === [$id, $now['id']], 'The calendar range listed the wrong posts');
     $api->get('/api/v1/posts', ['from' => '2026-01-01T00:00:00Z'])->assertStatus(422);
 
+    // Accounts are added from another machine, turned off and on, and removed.
+    $session = ['cookies' => [['name' => 'a', 'value' => 'b', 'domain' => 'bsky.app', 'path' => '/']], 'origins' => []];
+    $api->put('/api/v1/accounts/bluesky', ['handle' => '@fixture', 'session' => $session, 'source' => 'firefox'])
+        ->assertStatus(200)
+        ->assertJson('platforms.0.connected', true)
+        ->assertJson('platforms.0.enabled', true)
+        ->assertJson('platforms.0.source', 'firefox');
+    $api->put('/api/v1/accounts/bluesky', ['handle' => 'bad handle!', 'session' => $session])->assertStatus(422);
+    $api->put('/api/v1/accounts/bluesky', ['handle' => 'fixture', 'session' => 'nope'])->assertStatus(422);
+    $api->put('/api/v1/accounts/mastodon', ['handle' => 'fixture', 'session' => $session])->assertStatus(404);
+    $api->patch('/api/v1/accounts/bluesky', ['enabled' => 'no'])->assertStatus(422);
+    $api->patch('/api/v1/accounts/bluesky', ['enabled' => false])
+        ->assertStatus(200)
+        ->assertJson('platforms.0.enabled', false)
+        ->assertJson('platforms.0.available', false);
+    $calls = $publisher->calls;
+    $off = $api->post('/api/v1/posts', ['text' => 'off', 'platforms' => ['bluesky']])->assertStatus(200)->json();
+    $consumer->runNext();
+    $api->get('/api/v1/posts/' . $off['id'])->assertJson('status', 'failed');
+    api_check($publisher->calls === $calls, 'A turned-off account was published to');
+    $api->patch('/api/v1/accounts/bluesky', ['enabled' => true])->assertStatus(200)->assertJson('platforms.0.available', true);
+    $api->delete('/api/v1/accounts/bluesky')->assertStatus(200)->assertJson('platforms.0.connected', false);
+    $guest->delete('/api/v1/accounts/bluesky')->assertStatus(401);
+
     // Without a token the API is open.
     putenv('POSTSLOP_TOKEN=');
     new Api(test_app($directory . '/open'))->get('/api/v1/posts')->assertStatus(200);
-    echo "API checks passed: token checks, an open API without a token, drafts, images, edits, scheduling, publishing, history, deletion, and error codes.\n";
+    echo "API checks passed: token checks, an open API without a token, drafts, images, edits, scheduling, publishing, history, deletion, accounts, and error codes.\n";
 } finally {
     test_remove($directory);
 }

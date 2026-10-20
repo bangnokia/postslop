@@ -39,6 +39,30 @@ final readonly class PostsApi
             : $this->publishing->accounts();
     }
 
+    /** Saves an account's session, as `postslop setup --to=URL` sends it from another machine. */
+    public function importAccount(string $platform, ServerRequestInterface $request): array
+    {
+        $body = self::body($request);
+        $source = is_string($body['source'] ?? null) && preg_match('/^[a-z]{1,20}$/D', $body['source']) === 1
+            ? $body['source']
+            : 'remote';
+        return $this->publishing->importAccount($platform, $body['handle'] ?? null, $body['session'] ?? null, $source);
+    }
+
+    public function changeAccount(string $platform, ServerRequestInterface $request): array
+    {
+        $enabled = self::body($request)['enabled'] ?? null;
+        if (!is_bool($enabled)) {
+            throw Failure::invalid('Send {"enabled": true} or {"enabled": false}.');
+        }
+        return $this->publishing->setEnabled($platform, $enabled);
+    }
+
+    public function removeAccount(string $platform): array
+    {
+        return $this->publishing->removeAccount($platform);
+    }
+
     public function index(ServerRequestInterface $request): array
     {
         $query = $request->getQueryParams();

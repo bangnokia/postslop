@@ -3,7 +3,7 @@ import { api, ApiError, PLATFORM_NAMES, PLATFORMS, type NewImage, type Platform,
 import { Icon } from "../components/icons";
 import { blankDraft, length, loadDraft, prepareImage, saveDraft, toIso, toLocalInput, uuid, when, type LocalDraft } from "../compose";
 import { PageHeader, useShell } from "../shell";
-import { PlatformIcon, postsChanged, Results, type AccountState } from "../ui";
+import { PlatformIcon, postsChanged, Results, usable, type AccountState } from "../ui";
 
 type Mode = "now" | "schedule";
 
@@ -74,6 +74,17 @@ export function Composer({ editing, at, accounts, onDone }: { editing?: string; 
       live = false;
     };
   }, [editing]);
+
+  // Only accounts that are set up and turned on are offered; a saved post keeps the sites it was written for.
+  const offered = PLATFORMS.filter((platform) => {
+    const account = available.find((item) => item.id === platform);
+    return !account || usable(account) || (editing && draft?.platforms.includes(platform));
+  });
+  useEffect(() => {
+    if (!draft || editing || !accounts.accounts) return;
+    const kept = draft.platforms.filter((platform) => offered.includes(platform));
+    if (kept.length !== draft.platforms.length) edit({ platforms: kept });
+  }, [draft?.requestId, accounts.accounts]);
 
   function edit(change: Partial<LocalDraft>) {
     if (!draft) return;
@@ -310,7 +321,7 @@ export function Composer({ editing, at, accounts, onDone }: { editing?: string; 
           <h2 className="label">Publish to</h2>
           <fieldset className="destinations">
             <legend className="visually-hidden">Choose destinations</legend>
-            {PLATFORMS.map((platform) => {
+            {offered.map((platform) => {
               const account = available.find((item) => item.id === platform);
               return (
                 <label className="destination" key={platform} title={account?.reason ?? ""}>
@@ -324,7 +335,7 @@ export function Composer({ editing, at, accounts, onDone }: { editing?: string; 
                   <span className="destination-name">
                     {PLATFORM_NAMES[platform]}
                     <small data-error={account ? !account.available : false}>
-                      {accounts.checking && !account ? "Checking…" : account?.available ? `@${handle(platform)}` : account ? "Needs attention" : (accounts.error ?? "Could not check")}
+                      {accounts.checking && !account ? "Checking…" : account?.available ? `@${handle(platform)}` : account && !usable(account) ? (account.connected ? "Turned off" : "Not connected") : account ? "Needs attention" : (accounts.error ?? "Could not check")}
                     </small>
                   </span>
                   <span className="checkbox" aria-hidden="true">
@@ -334,6 +345,11 @@ export function Composer({ editing, at, accounts, onDone }: { editing?: string; 
               );
             })}
           </fieldset>
+          {offered.length === 0 && (
+            <p className="side-note">
+              <Icon name="alert" /> No account is set up and turned on. <a href="#/accounts">Set up accounts</a>
+            </p>
+          )}
           {unavailable.length > 0 && mode === "now" && (
             <p className="side-note">
               <Icon name="alert" /> {unavailable.map((platform) => PLATFORM_NAMES[platform]).join(", ")} not ready. <a href="#/accounts">Check accounts</a>

@@ -8,8 +8,11 @@ use App\PrivateFiles;
 
 /**
  * Every account's handle and browser session, in one private JSON file:
- * {"accounts": {"x": {"handle": "…", "importedAt": "…", "source": "chrome", "session": {"cookies": […], "origins": […]}}}}
+ * {"accounts": {"x": {"handle": "…", "enabled": true, "importedAt": "…", "source": "chrome", "session": {…}}}}
+ * One account per site. A turned-off account keeps its session but is never offered or published to.
  */
+// The store is the session file's whole interface.
+// @mago-expect lint:cyclomatic-complexity,too-many-methods
 final readonly class SessionStore
 {
     private const array PLATFORMS = ['x', 'bluesky', 'dev-null'];
@@ -35,6 +38,47 @@ final readonly class SessionStore
         });
     }
 
+    /**
+     * What is known about an account without its secrets.
+     *
+     * @return array{connected: bool, enabled: bool, handle: ?string, importedAt: ?string, source: ?string}
+     */
+    public function summary(string $platform): array
+    {
+        $account = $this->account($platform);
+        return [
+            'connected' => is_array($account['session'] ?? null),
+            'enabled' => ($account['enabled'] ?? true) !== false,
+            'handle' => is_string($account['handle'] ?? null) ? $account['handle'] : null,
+            'importedAt' => is_string($account['importedAt'] ?? null) ? $account['importedAt'] : null,
+            'source' => is_string($account['source'] ?? null) ? $account['source'] : null,
+        ];
+    }
+
+    public function enabled(string $platform): bool
+    {
+        return $this->summary($platform)['enabled'];
+    }
+
+    public function setEnabled(string $platform, bool $enabled): void
+    {
+        self::check($platform);
+        $this->change(static function (array $accounts) use ($platform, $enabled): array {
+            $accounts[$platform] = [...($accounts[$platform] ?? []), 'enabled' => $enabled];
+            return $accounts;
+        });
+    }
+
+    /** Forgets the account: its handle and session leave the file. */
+    public function remove(string $platform): void
+    {
+        self::check($platform);
+        $this->change(static function (array $accounts) use ($platform): array {
+            unset($accounts[$platform]);
+            return $accounts;
+        });
+    }
+
     public function expectedHandle(string $platform): ?string
     {
         $handle = $this->account($platform)['handle'] ?? null;
@@ -49,6 +93,8 @@ final readonly class SessionStore
                 self::check($platform);
                 $accounts[$platform] = [
                     'handle' => $account['handle'],
+                    // Importing an account again turns it back on.
+                    'enabled' => true,
                     'importedAt' => gmdate('Y-m-d\TH:i:s\Z'),
                     'source' => $source,
                     'session' => $account['session'],

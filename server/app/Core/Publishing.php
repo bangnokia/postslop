@@ -8,6 +8,7 @@ use App\Jobs\PublishPost;
 use App\PrivateFiles;
 use App\Social\ImageAttachment;
 use App\Social\Publisher;
+use App\Social\SessionStore;
 use Crab\Contracts\Cache\Cache;
 use Crab\Contracts\Database\Connection;
 use Crab\Contracts\Database\Database;
@@ -28,6 +29,8 @@ final readonly class Publishing
 
     /**
      * @param array<string, Publisher> $publishers
+     * @param array<string, string> $localData Folders an account keeps besides its session, such as X's browser
+     *     profile, removed with it.
      */
     // The core is built once, from every service it uses.
     // @mago-expect lint:excessive-parameter-list
@@ -38,6 +41,8 @@ final readonly class Publishing
         private Queue $queue,
         private string $lockFile,
         private string $mediaDirectory,
+        private SessionStore $sessions,
+        private array $localData = [],
     ) {}
 
     /**
@@ -55,6 +60,29 @@ final readonly class Publishing
         return $this->cache->remember(self::ACCOUNTS, 30, function (): array {
             $platforms = [];
             foreach ($this->publishers as $id => $publisher) {
+                $account = $this->sessions->summary($id);
+                $extra = [
+                    'enabled' => $account['enabled'],
+                    'connected' => $account['connected'],
+                    'importedAt' => $account['importedAt'],
+                    'source' => $account['source'],
+                    'maxImages' => Platforms::maxImages([$id]),
+                    'textLimit' => Platforms::TEXT_LIMITS[$id] ?? null,
+                ];
+                // An account without a session, or turned off, is not checked: it is not used as it is.
+                if (!$account['connected'] || !$account['enabled']) {
+                    $platforms[] = [
+                        'id' => $id,
+                        'label' => Platforms::LABELS[$id] ?? $id,
+                        'available' => false,
+                        'handle' => $account['handle'],
+                        'reason' => $account['connected']
+                            ? 'Turned off in Postslop.'
+                            : 'Not connected. Run: postslop setup ' . $id,
+                        ...$extra,
+                    ];
+                    continue;
+                }
                 try {
                     $status = $publisher->status();
                 } catch (\Throwable) {
@@ -65,14 +93,11 @@ final readonly class Publishing
                         'reason' => 'Could not verify this session. Reimport it and try again.',
                     ];
                 }
-                if (is_string($status['handle'] ?? null)) {
-                    $status['handle'] = ltrim($status['handle'], '@');
-                }
-                $platforms[] = [
-                    ...$status,
-                    'maxImages' => Platforms::maxImages([$id]),
-                    'textLimit' => Platforms::TEXT_LIMITS[$id] ?? null,
-                ];
+                // A session that cannot sign in still shows the handle it was imported for.
+                $status['handle'] = is_string($status['handle'] ?? null)
+                    ? ltrim($status['handle'], '@')
+                    : $account['handle'];
+                $platforms[] = [...$status, ...$extra];
             }
             return [
                 'platforms' => $platforms,
@@ -80,6 +105,63 @@ final readonly class Publishing
                 'publishingEnabled' => true,
             ];
         });
+    }
+
+    /**
+     * Turns an account on or off. A turned-off account keeps its session, is left out of the composer, and any post
+     * still addressed to it fails for that site without sending anything.
+     */
+    public function setEnabled(string $platform, bool $enabled): array
+    {
+        self::platform($platform);
+        $this->sessions->setEnabled($platform, $enabled);
+        return $this->refreshAccounts();
+    }
+
+    /**
+     * Forgets an account: its session and anything it kept on disk. Its posts stay in the history.
+     */
+    public function removeAccount(string $platform): array
+    {
+        self::platform($platform);
+        $this->sessions->remove($platform);
+        $folder = $this->localData[$platform] ?? null;
+        if ($folder !== null) {
+            self::removeTree($folder);
+        }
+        return $this->refreshAccounts();
+    }
+
+    /**
+     * Saves one account's handle and browser session, as `postslop setup` imports it or as another machine sends
+     * it, then checks it signs in as that handle.
+     */
+    public function importAccount(string $platform, mixed $handle, mixed $session, string $source): array
+    {
+        self::platform($platform);
+        $handle = is_string($handle) ? ltrim(trim($handle), '@') : '';
+        if (preg_match('/^[A-Za-z0-9._-]{1,100}$/D', $handle) !== 1) {
+            throw Failure::invalid('Give the account’s handle: letters, numbers, dots, underscores or hyphens.');
+        }
+        if (
+            !is_array($session)
+            || !array_is_list($session['cookies'] ?? null)
+            || !array_is_list($session['origins'] ?? [])
+        ) {
+            throw Failure::invalid(
+                'The session must hold the browser’s cookies and origins, as postslop setup reads them.',
+            );
+        }
+        $this->sessions->import([
+            $platform => [
+                'handle' => $handle,
+                'session' => [
+                    'cookies' => $session['cookies'],
+                    'origins' => $session['origins'] ?? [],
+                ],
+            ],
+        ], $source);
+        return $this->refreshAccounts();
     }
 
     /**
@@ -431,6 +513,14 @@ final readonly class Publishing
                 'status' => 'unknown',
                 'error' => 'Publishing started but no result was recorded. Check the account before sending again.',
             ]);
+            if (!$this->sessions->enabled($platform)) {
+                $this->record($post['id'], $platform, [
+                    'platform' => $platform,
+                    'status' => 'failed',
+                    'error' => 'This account is turned off in Postslop. Nothing was posted; turn it on and retry.',
+                ]);
+                continue;
+            }
             try {
                 $result = $this->publishers[$platform]->publish($post['id'], $post['text'], $images);
             } catch (\Throwable) {
@@ -658,5 +748,33 @@ final readonly class Publishing
     private static function now(): string
     {
         return gmdate('Y-m-d\TH:i:s\Z');
+    }
+
+    private static function platform(string $platform): void
+    {
+        if (!in_array($platform, Platforms::IDS, true)) {
+            throw Failure::notFound(
+                'There is no ' . $platform . ' account. Use ' . implode(', ', Platforms::IDS) . '.',
+            );
+        }
+    }
+
+    private static function removeTree(string $path): void
+    {
+        if (is_link($path) || is_file($path)) {
+            unlink($path);
+            return;
+        }
+        if (!is_dir($path)) {
+            return;
+        }
+        $names = scandir($path);
+        if ($names === false) {
+            return;
+        }
+        foreach (array_diff($names, ['.', '..']) as $name) {
+            self::removeTree($path . '/' . $name);
+        }
+        rmdir($path);
     }
 }

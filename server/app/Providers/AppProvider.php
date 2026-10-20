@@ -60,6 +60,8 @@ final class AppProvider implements Provider
                 $container->get(Queue::class),
                 config('postslop.lock_file'),
                 config('postslop.media_path'),
+                $sessions,
+                ['x' => config('postslop.x_browser_profile')],
             );
         });
         // `serve` runs the schedule and the queue when SERVER_SCHEDULE and SERVER_QUEUE are on.

@@ -48,7 +48,12 @@ export interface AccountState {
   error?: string;
   checking: boolean;
   refresh: () => void;
+  // Shows the accounts an account change answered with.
+  replace: (accounts: Accounts) => void;
 }
+
+// Set up and turned on: the accounts the composer offers.
+export const usable = (account?: { enabled: boolean; connected: boolean }) => Boolean(account?.enabled && account.connected);
 
 export function useAccounts(): AccountState {
   const [accounts, setAccounts] = useState<Accounts>();
@@ -66,7 +71,7 @@ export function useAccounts(): AccountState {
       .finally(() => setChecking(false));
   };
   useEffect(() => load(false), []);
-  return { accounts, error, checking, refresh: () => load(true) };
+  return { accounts, error, checking, refresh: () => load(true), replace: setAccounts };
 }
 
 export type Theme = "system" | "light" | "dark";
