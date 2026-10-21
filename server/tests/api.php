@@ -138,6 +138,15 @@ try {
     $api->get('/api/v1/posts/' . $off['id'])->assertJson('status', 'failed');
     api_check($publisher->calls === $calls, 'A turned-off account was published to');
     $api->patch('/api/v1/accounts/bluesky', ['enabled' => true])->assertStatus(200)->assertJson('platforms.0.available', true);
+    // Retrying answers at once too; the site's queue resends the failed destination.
+    $api->post('/api/v1/posts/' . $off['id'] . '/retry', [])
+        ->assertStatus(200)
+        ->assertJson('status', 'publishing')
+        ->assertJson('results.0.status', 'queued');
+    api_check($publisher->calls === $calls, 'Retrying sent the post before the queue ran');
+    api_check($consumer->runNext(['bluesky']) && !$consumer->runNext(), 'Retrying did not queue one job on the site\'s queue');
+    $api->get('/api/v1/posts/' . $off['id'])->assertJson('status', 'published');
+    $api->post('/api/v1/posts/' . $off['id'] . '/retry', [])->assertStatus(422);
     $api->delete('/api/v1/accounts/bluesky')->assertStatus(200)->assertJson('platforms.0.connected', false);
     $guest->delete('/api/v1/accounts/bluesky')->assertStatus(401);
 

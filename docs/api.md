@@ -2,7 +2,7 @@
 
 The web client talks to the core through this API. The command line (`bin/postslop`) runs the same core directly; both follow the same rules.
 
-Base URL: `http://127.0.0.1:8087`. When `POSTSLOP_TOKEN` is set in `server/.env`, every `/api/` request requires `Authorization: Bearer <POSTSLOP_TOKEN>`, from any host; when it is empty, the API is open to anyone who can reach it. The token is private and must not appear in examples, logs or shared files. `POST` and `PUT` bodies must be `Content-Type: application/json`. Responses are not cached.
+Base URL: `SERVER_ADDRESS` from `server/.env` (`http://127.0.0.1:8087` by default). When `POSTSLOP_TOKEN` is set in `server/.env`, every `/api/` request requires `Authorization: Bearer <POSTSLOP_TOKEN>`, from any host; when it is empty, the API is open to anyone who can reach it. The token is private and must not appear in examples, logs or shared files. `POST` and `PUT` bodies must be `Content-Type: application/json`. Responses are not cached.
 
 ## Posts and their lifecycle
 
@@ -39,9 +39,9 @@ Times are UTC. A URL identifies an existing post on that site; it is never an in
 ### Rules against posting twice
 
 - The post's `id` is the client's request ID. Sending the same ID again returns what was recorded and never sends it again. Different content under an existing ID is refused with 409.
-- Before contacting each site, the core records that destination as `unknown`. A crash leaves the uncertain destination recorded, and destinations it never reached marked as failed.
+- Before contacting a site, the core moves that destination from `queued` to `sending` in one write, so only one worker ever sends it. A crash leaves it `unknown`; a destination never picked up within 15 minutes becomes `failed`.
 - `unknown` is never retried, automatically or by `/retry`: the post may already be live. Check the account first.
-- One post publishes at a time. Another attempt meanwhile gets 409 `busy`, and its post is kept as a draft.
+- Each site sends one post at a time; different sites send at the same time. Publishing a post already on its way returns it unchanged.
 
 ## Accounts — `GET /api/v1/accounts`
 
@@ -110,7 +110,7 @@ These work on drafts and scheduled posts only; a sent post's history cannot chan
 
 ## Retry — `POST /api/v1/posts/{id}/retry`
 
-Sends again to the destinations that `failed`, with the stored text and images, under the same post. Unknown destinations are left alone. 422 when nothing failed.
+Sends again to the destinations that `failed`, with the stored text and images, under the same post. Like publishing, it answers at once with the post `publishing` and those results `queued`; poll for the outcome. Unknown destinations are left alone. 422 when nothing failed or the post is still publishing.
 
 ## Errors
 
@@ -120,8 +120,7 @@ Sends again to the destinations that `failed`, with the stored text and images, 
 | --- | --- | --- |
 | 401 | | Missing or invalid access token, when one is set |
 | 404 | `not_found` | Unknown post, image or route |
-| 409 | `busy` | Another post is publishing; try again shortly |
-| 409 | `conflict` | The request ID belongs to other content, or the post was already sent |
+| 409 | `conflict` | The request ID belongs to other content, or the post was already sent (also when it was sent while you edited it) |
 | 413 | | Body larger than the server's 7 MiB limit |
 | 415 | | A `POST` or `PUT` without JSON |
 | 422 | `invalid` | Invalid input; the message says what to fix |

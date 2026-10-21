@@ -243,9 +243,10 @@ final readonly class Publishing
     {
         $this->editable($id);
         $this->db->transaction(function (Connection $tx) use ($id, $request): void {
-            $tx
+            $changed = $tx
                 ->table('posts')
                 ->where('id', $id)
+                ->whereIn('status', self::EDITABLE)
                 ->update([
                     'text' => $request->text,
                     'platforms' => json_encode($request->platforms, JSON_THROW_ON_ERROR),
@@ -254,6 +255,7 @@ final readonly class Publishing
                     'scheduled_at' => $request->scheduledAt?->format('Y-m-d\TH:i:s\Z'),
                     'updated_at' => self::now(),
                 ]);
+            $this->stillEditable($changed);
             $this->removeImages($tx, $id);
             $this->storeImages($tx, $id, $request->images);
         });
@@ -305,14 +307,16 @@ final readonly class Publishing
         if ($at !== null && $at->getTimestamp() < (time() - 60)) {
             throw Failure::invalid('The scheduled time has already passed.');
         }
-        $this->db
+        $changed = $this->db
             ->table('posts')
             ->where('id', $id)
+            ->whereIn('status', self::EDITABLE)
             ->update([
                 'status' => $at === null ? 'draft' : 'scheduled',
                 'scheduled_at' => $at?->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
                 'updated_at' => self::now(),
             ]);
+        $this->stillEditable($changed);
         return $this->find($id);
     }
 
@@ -324,7 +328,7 @@ final readonly class Publishing
         $this->editable($id);
         $this->db->transaction(function (Connection $tx) use ($id): void {
             $this->removeImages($tx, $id);
-            $tx->table('posts')->where('id', $id)->delete();
+            $this->stillEditable($tx->table('posts')->where('id', $id)->whereIn('status', self::EDITABLE)->delete());
         });
     }
 
@@ -347,40 +351,62 @@ final readonly class Publishing
      */
     public function retry(string $id): array
     {
-        $failed = $this->db->transaction(static function (Connection $tx) use ($id): array {
-            $post = $tx->table('posts')->where('id', $id)->first() ?? throw Failure::notFound();
-            if (in_array($post['status'], [...self::EDITABLE, 'queued', 'publishing'], true)) {
-                throw Failure::invalid('This post has not finished publishing.');
-            }
-            $failed = $tx
-                ->table('deliveries')
-                ->where('post_id', $id)
-                ->where('status', 'failed')
-                ->orderBy('position')
-                ->pluck('platform');
-            if ($failed === []) {
-                throw Failure::invalid(
-                    'No destination failed. Unknown results are never retried; check the account instead.',
-                );
-            }
-            $tx->table('posts')->where('id', $id)->update(['status' => 'publishing', 'updated_at' => self::now()]);
-            foreach ($failed as $platform) {
-                $tx
-                    ->table('deliveries')
-                    ->where('post_id', $id)
-                    ->where('platform', $platform)
-                    ->update([
-                        'status' => 'queued',
-                        'result' => self::encode(['platform' => $platform, 'status' => 'queued']),
-                        'updated_at' => self::now(),
-                    ]);
-            }
-            return $failed;
-        });
+        $failed = $this->db->transaction(static fn(Connection $tx): array => self::reopen($tx, $id));
         foreach ($failed as $platform) {
             $this->deliver($id, $platform);
         }
         return $this->find($id);
+    }
+
+    /**
+     * As retry(), except that the failed destinations are handed to their sites' queues and the post is answered
+     * at once, as in queue().
+     */
+    public function retryQueued(string $id): array
+    {
+        $this->db->transaction(function (Connection $tx) use ($id): void {
+            foreach (self::reopen($tx, $id) as $platform) {
+                $this->queue->within($tx)->on($platform)->push(PublishDelivery::class, id: $id, platform: $platform);
+            }
+        });
+        return $this->find($id);
+    }
+
+    /**
+     * Marks a finished post as publishing again, with its failed destinations waiting to be sent, and returns them.
+     *
+     * @return list<string>
+     */
+    private static function reopen(Connection $tx, string $id): array
+    {
+        $post = $tx->table('posts')->where('id', $id)->first() ?? throw Failure::notFound();
+        if (in_array($post['status'], [...self::EDITABLE, 'queued', 'publishing'], true)) {
+            throw Failure::invalid('This post has not finished publishing.');
+        }
+        $failed = $tx
+            ->table('deliveries')
+            ->where('post_id', $id)
+            ->where('status', 'failed')
+            ->orderBy('position')
+            ->pluck('platform');
+        if ($failed === []) {
+            throw Failure::invalid(
+                'No destination failed. Unknown results are never retried; check the account instead.',
+            );
+        }
+        $tx->table('posts')->where('id', $id)->update(['status' => 'publishing', 'updated_at' => self::now()]);
+        foreach ($failed as $platform) {
+            $tx
+                ->table('deliveries')
+                ->where('post_id', $id)
+                ->where('platform', $platform)
+                ->update([
+                    'status' => 'queued',
+                    'result' => self::encode(['platform' => $platform, 'status' => 'queued']),
+                    'updated_at' => self::now(),
+                ]);
+        }
+        return $failed;
     }
 
     /**
@@ -804,6 +830,14 @@ final readonly class Publishing
             throw Failure::conflict('This post was already sent. Its history cannot be changed.');
         }
         return $post;
+    }
+
+    /** A write guarded on the post still being a draft or scheduled changed nothing: it was sent meanwhile. */
+    private function stillEditable(int $changed): void
+    {
+        if ($changed === 0) {
+            throw Failure::conflict('This post was already sent. Its history cannot be changed.');
+        }
     }
 
     private function row(string $id): ?array

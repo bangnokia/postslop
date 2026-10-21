@@ -119,7 +119,7 @@ final readonly class PostsApi
 
     public function retry(string $id): array
     {
-        return $this->publishing->retry($id);
+        return $this->publishing->retryQueued($id);
     }
 
     public function schedule(string $id, ServerRequestInterface $request): array

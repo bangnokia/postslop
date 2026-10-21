@@ -52,7 +52,7 @@ postslop serve                             # web client, API, schedule and queue
 
 **A post is a draft unless you say `--now` or give a time.** So an AI agent can prepare posts safely, and nothing goes public without an explicit flag. `postslop help post` lists every option.
 
-For scripts and agents, every command takes `--json` and prints exactly one JSON document, errors included. `--input=-` reads a whole post as JSON from standard input, with images by path and their descriptions. Exit codes are stable: `0` ok, `2` invalid, `3` partly published, `4` failed, `5` unknown outcome, `6` busy, `7` conflict, `8` not found. `--request-id=UUID` makes a command safe to repeat, and `--dry-run` checks a post and the accounts without saving anything.
+For scripts and agents, every command takes `--json` and prints exactly one JSON document, errors included. `--input=-` reads a whole post as JSON from standard input, with images by path and their descriptions. Exit codes are stable: `0` ok, `2` invalid, `3` partly published, `4` failed, `5` unknown outcome, `6` busy, `7` conflict, `8` not found. `--request-id=UUID` makes a command safe to repeat, and `--dry-run` checks a post and the accounts without saving anything. [docs/agents.md](docs/agents.md) is a guide to hand an AI agent.
 
 ### Scheduling
 
