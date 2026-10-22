@@ -12,7 +12,7 @@
 - After a fully successful publish, automatically clear the composer UI and saved draft, including text and attachments; retain drafts for failed or uncertain results.
 - All publishing and retries must run through Postslop; do not manually publish through Chrome or another site's composer.
 - Keep normal publishing inside Postslop/Raycast without opening visible browser windows; any background browser worker must be owned by the app.
-- Keep the Postslop composer entirely inside the Raycast extension; use its native controls and an explicit Paste Image action (⌘⇧V), without launching a separate macOS composer app.
+- Keep the Postslop composer entirely inside the Raycast extension; use its native controls and an explicit Paste Image action (⌃⇧V), without launching a separate macOS composer app.
 - Preserve drafts when publishing fails and clear them after full success in both clients.
 - Retain the web client alongside the Raycast extension; both go through the same core, with future server hosting in mind.
 - Raycast uses the local CLI by default, and the HTTP API of a Postslop on another machine when its Server URL and Access Token preferences are set; support both.

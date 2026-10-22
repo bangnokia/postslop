@@ -80,7 +80,7 @@ npm run dev      # or work on it at http://127.0.0.1:5173 against the running se
 
 ## Raycast
 
-The **Postslop** extension composes inside Raycast. It runs the local CLI, so it needs no server; or set its **Server URL** and **Access Token** preferences to post through a Postslop on another machine. Press ⌘⇧V to paste an image, and ⌘Enter to hand the post to a background command and close Raycast. A HUD reports the result. See [its guide](clients/raycast/README.md).
+The **Postslop** extension composes inside Raycast. It runs the local CLI, so it needs no server; or set its **Server URL** and **Access Token** preferences to post through a Postslop on another machine. Press ⌃⇧V to paste an image, and ⌘Enter to hand the post to a background command and close Raycast. A HUD reports the result. See [its guide](clients/raycast/README.md).
 
 ## Browser sessions
 

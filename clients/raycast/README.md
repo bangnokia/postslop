@@ -14,14 +14,14 @@ This compiles a small background image helper and installs the extension in Rayc
 ## Compose
 
 - Write in the native Raycast multiline textarea. Ordinary text paste uses **⌘V**.
-- Use **Paste Image** (**⌘⇧V**) to attach a screenshot, copied image pixels, or a copied image file. You can also choose files using the Images field.
+- Use **Paste Image** (**⌃⇧V**) to attach a screenshot, copied image pixels, or a copied image file. You can also choose files using the Images field.
 - Attached images appear in the Images list immediately below the textarea. Remove an attachment with its **×** button; edit its optional description below. Image previews are omitted to keep the native form simple.
 - Choose destinations; your selection persists.
 - Use **Publish** (**⌘Enter**) to save and hand off the post immediately, without another confirmation. Raycast closes while a separate background command finishes publishing. The textarea uses Raycast's standard newline behavior.
 - **New Post** (**⌘N**) opens an empty composer and keeps the previous draft or result in **Saved Posts**.
 - **Escape** leaves the command and keeps the draft. The next launch starts a new post; **Saved Posts** restores anything you were working on.
 
-Raycast's supported form controls determine the textarea size and keyboard behavior. Clipboard images use **⌘⇧V**; ordinary text paste remains **⌘V**. The retained web composer includes image thumbnails.
+Raycast's supported form controls determine the textarea size and keyboard behavior. Clipboard images use **⌃⇧V**; ordinary text paste remains **⌘V**. The retained web composer includes image thumbnails.
 
 The extension supports four images, or three when dev-null.sh is selected. The background helper resizes images to JPEG locally, each no larger than 1 MiB. Transparent backgrounds become white. It reads the pasteboard only when Paste Image is invoked and does not monitor clipboard history.
 

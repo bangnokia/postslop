@@ -450,7 +450,7 @@ export default function Postslop() {
             <Action
               title="Paste Image"
               icon={Icon.Clipboard}
-              shortcut={{ modifiers: ["cmd", "shift"], key: "v" }}
+              shortcut={{ modifiers: ["ctrl", "shift"], key: "v" }}
               onAction={() =>
                 changeImages([
                   ...draft.images.map((image) => image.path),
@@ -535,7 +535,7 @@ export default function Postslop() {
           canChooseDirectories={false}
           allowMultipleSelection
           onChange={changeImages}
-          info="Choose image files, or paste an image with ⌘⇧V. Remove an attachment using its × button."
+          info="Choose image files, or paste an image with ⌃⇧V. Remove an attachment using its × button."
         />
       )}
       <Form.Description
@@ -628,7 +628,7 @@ export default function Postslop() {
         );
       })}
       {!locked && (
-        <Form.Description text="⌘↵ publish in background · ⌘⇧V paste image · ⌘V paste text." />
+        <Form.Description text="⌘↵ publish in background · ⌃⇧V paste image · ⌘V paste text." />
       )}
     </Form>
   );
