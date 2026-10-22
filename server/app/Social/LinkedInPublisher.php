@@ -169,7 +169,9 @@ final readonly class LinkedInPublisher implements Publisher
         }
         $session = [
             'url' => $this->baseUrl(),
-            'client' => $this->http->timeout(35)->retry(0),
+            // Some networks reset many connections to LinkedIn before they are set up. Such a request was never
+            // sent, so it is tried again; one LinkedIn may have received (even a POST) never is.
+            'client' => $this->http->timeout(35)->retry(6, delay: 0.25),
             'cookie' => implode('; ', array_map(
                 static fn(string $name, string $value): string => $name . '=' . $value,
                 array_keys($cookies),
