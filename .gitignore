@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 /server/vendor/
+/vendor/
 node_modules/
 /server/storage/**
 !/server/storage/.gitkeep

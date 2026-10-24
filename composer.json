@@ -1,0 +1,91 @@
+{
+    "name": "postslop/workspace",
+    "description": "Root commands for the Postslop server and clients",
+    "type": "project",
+    "config": {
+        "process-timeout": 0,
+        "lock": false
+    },
+    "scripts": {
+        "deps": [
+            "@composer --working-dir=server install",
+            "npm --prefix clients/web ci",
+            "npm --prefix server/browser-worker ci"
+        ],
+        "setup": [
+            "@php -r \"if (!file_exists('server/.env') && !copy('server/.env.example', 'server/.env')) { exit(1); }\"",
+            "@php server/scripts/setup.php"
+        ],
+        "start": "@php server/bin/postslop serve --daemon",
+        "serve": "@php server/bin/postslop serve",
+        "stop": "@php server/cua stop",
+        "restart": "@php server/bin/postslop restart",
+        "reload": "@php server/bin/postslop reload",
+        "server:status": "@php server/cua status",
+        "cli": "@php server/bin/postslop",
+        "cua": "@php server/cua",
+        "accounts": "@php server/bin/postslop accounts",
+        "accounts:import": "@php server/bin/postslop setup",
+        "build": "npm --prefix clients/web run build",
+        "web:dev": "npm --prefix clients/web run dev",
+        "browser:setup": "npm --prefix server/browser-worker run setup",
+        "raycast:install": "npm --prefix clients/raycast ci",
+        "raycast:dev": "npm --prefix clients/raycast run dev",
+        "raycast:build": "npm --prefix clients/raycast run build",
+        "raycast:check": [
+            "npm --prefix clients/raycast run typecheck",
+            "npm --prefix clients/raycast run lint"
+        ],
+        "format": "@composer --working-dir=server format",
+        "format:check": "@composer --working-dir=server format:check",
+        "lint": "@composer --working-dir=server lint",
+        "test:server": [
+            "@php server/tests/core.php",
+            "@php server/tests/api.php",
+            "@php server/tests/x-rejections.php",
+            "@php server/tests/threads.php"
+        ],
+        "test:browser": [
+            "@php server/tests/browser-publisher.php",
+            "npm --prefix server/browser-worker test"
+        ],
+        "test": [
+            "@test:server",
+            "@test:browser"
+        ],
+        "check": [
+            "@format:check",
+            "@lint",
+            "@test",
+            "@build"
+        ]
+    },
+    "scripts-descriptions": {
+        "deps": "Install locked server, web and browser-worker dependencies",
+        "setup": "Create server/.env if missing and prepare private storage and the database",
+        "start": "Start the web server, schedule and queues in the background",
+        "serve": "Run the server in the foreground with file watching",
+        "stop": "Gracefully stop the background server",
+        "restart": "Stop and start the background server",
+        "reload": "Load new code in the background server without dropping its listening socket",
+        "server:status": "Show the background server's status",
+        "cli": "Run any Postslop command; pass arguments after --",
+        "cua": "Run any CrabPHP command; pass arguments after --",
+        "accounts": "Show connected social accounts",
+        "accounts:import": "Import browser sessions; supports --to for a remote Postslop",
+        "build": "Build the web client into server/public",
+        "web:dev": "Run the Vite development server",
+        "browser:setup": "Install the private X worker's Firefox browser",
+        "raycast:install": "Install locked Raycast dependencies",
+        "raycast:dev": "Develop the Raycast extension (macOS)",
+        "raycast:build": "Build the Raycast extension and native image helper (macOS)",
+        "raycast:check": "Typecheck and lint the Raycast extension",
+        "format": "Format PHP sources",
+        "format:check": "Check PHP formatting",
+        "lint": "Lint PHP sources",
+        "test:server": "Run core, API and HTTP publishing checks against fakes",
+        "test:browser": "Run the browser bridge and worker checks against fakes",
+        "test": "Run all server and browser publishing checks",
+        "check": "Check PHP formatting, lint, tests and the web build"
+    }
+}

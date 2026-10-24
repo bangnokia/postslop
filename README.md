@@ -26,15 +26,57 @@ One core holds every rule: drafts, scheduling, history, and never posting the sa
 Requires PHP 8.4+ with `fileinfo` and `gd`, Composer, Node 22+ and Python 3. Composer installs CrabPHP from GitHub at the exact commit in `composer.lock`.
 
 ```sh
-cd server
-composer install
-cp -n .env.example .env        # only on a new checkout
-php scripts/setup.php          # private storage and database; set POSTSLOP_TOKEN in .env
-cd browser-worker && npm ci && npm run setup && cd ..   # X's private headless browser
-bin/postslop setup             # import your signed-in sessions from Chrome
+composer deps                 # locked server, web and browser-worker dependencies
+composer setup                # create server/.env if missing; private storage and database
+# Set POSTSLOP_TOKEN in server/.env before exposing the server.
+composer browser:setup        # X's private headless browser
+composer build                # web client into server/public
+composer accounts:import      # import your signed-in sessions from Chrome
 ```
 
-To call it as `postslop` from anywhere, link it onto your path: `ln -s "$PWD/bin/postslop" /opt/homebrew/bin/postslop`.
+Run these commands from the repository root. The root Composer file provides shortcuts; PHP dependencies and their lockfile remain in `server/`. Use `composer deps` to install them. Raycast is optional: `composer raycast:install` installs its dependencies, and `composer raycast:build` builds it on macOS.
+
+To call it as `postslop` from anywhere, link it onto your path from the repository root: `ln -s "$PWD/server/bin/postslop" /opt/homebrew/bin/postslop`.
+
+## Root commands
+
+```sh
+composer start                # start in the background
+composer server:status        # inspect the background server
+composer reload               # load updated code while keeping the listening socket
+composer restart              # stop and start again
+composer stop                 # gracefully stop the background server
+composer serve                # foreground development server; Ctrl+C stops it
+```
+
+These use `server/.env` and the same CrabPHP server commands as before. The schedule and queues start when `SERVER_SCHEDULE` and `SERVER_QUEUE` are enabled. Background servers do not watch files; use `composer reload` after changes. `stop`, `reload`, `restart` and `server:status` manage the background server started by `composer start`; stop a foreground `composer serve` with Ctrl+C. Composer's built-in `status` command is unrelated, hence `server:status`.
+
+| Command | Purpose |
+| --- | --- |
+| `composer cli -- COMMAND [ARGS]` | Any Postslop CLI command, including drafts, history and scheduling |
+| `composer accounts` | Check social accounts |
+| `composer accounts:import -- [SITES] [OPTIONS]` | Import local browser sessions or push them with `--to=URL` |
+| `composer cua -- COMMAND [ARGS]` | Framework commands, including migrations, schedule and queue inspection |
+| `composer build` / `composer web:dev` | Build the web client / run Vite |
+| `composer raycast:dev` / `composer raycast:build` | Develop / build Raycast on macOS |
+| `composer format` / `composer lint` | Format / lint PHP |
+| `composer test` | Server and browser checks against fake sites |
+| `composer check` | PHP formatting, lint, all tests and the web build |
+| `composer raycast:check` | Raycast TypeScript and lint checks |
+| `composer run --list` | List every shortcut and its description |
+
+Pass arguments after `--`, for example:
+
+```sh
+composer cli -- post "A saved draft" --to=threads
+composer cli -- posts --status=scheduled
+composer accounts:import -- threads --threads=YOUR_HANDLE --to=https://YOUR_SERVER
+composer cua -- schedule:list
+composer cua -- queue:failed
+composer start -- --address=tcp://0.0.0.0:8123
+```
+
+Remote account imports use `POSTSLOP_REMOTE_TOKEN` or an explicit `--token=TOKEN`. `composer cli -- accounts --json` keeps JSON on standard output; avoid Composer's `--quiet` option, which also suppresses command output.
 
 ## Command line
 
@@ -72,10 +114,8 @@ For scripts and agents, every command takes `--json` and prints exactly one JSON
 Build it once, and again after changing it:
 
 ```sh
-cd clients/web
-npm ci
-npm run build    # writes server/public
-npm run dev      # or work on it at http://127.0.0.1:5173 against the running server
+composer build    # writes server/public
+composer web:dev  # work at http://127.0.0.1:5173 against the running server
 ```
 
 ## Raycast
@@ -110,14 +150,9 @@ Each post's ID is its request ID, with a fingerprint of its content. Before cont
 ## Checks
 
 ```sh
-cd server
-composer format:check && composer lint
-php tests/core.php && php tests/api.php
-php tests/x-rejections.php && php tests/browser-publisher.php
-php tests/threads.php
-(cd browser-worker && npm test)
-(cd ../clients/web && npm run build)
-(cd ../clients/raycast && npm run typecheck && npm run lint && npm run build)
+composer check
+composer raycast:check
+composer raycast:build    # macOS, including the native image helper
 ```
 
 The core checks cover repeated and interrupted submissions, locking, drafts, scheduling, retries, validation and private media. [Testing against fake sites](docs/testing.md) runs the real server, CLI, browser worker and Raycast client end to end. A pass against fakes is not a claim that a real site accepted a post.

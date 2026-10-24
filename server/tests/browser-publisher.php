@@ -20,7 +20,16 @@ function browser_check(bool $condition, string $message): void
 }
 
 $configuredNode = getenv('POSTSLOP_NODE_BINARY');
-$node = $configuredNode === false || $configuredNode === '' ? '/opt/homebrew/bin/node' : $configuredNode;
+$node = $configuredNode === false ? '' : $configuredNode;
+if ($node === '') {
+    foreach ([...explode(PATH_SEPARATOR, (string) getenv('PATH')), '/opt/homebrew/bin'] as $directory) {
+        $candidate = $directory . '/node';
+        if (is_file($candidate) && is_executable($candidate)) {
+            $node = $candidate;
+            break;
+        }
+    }
+}
 browser_check(is_executable($node), 'Set POSTSLOP_NODE_BINARY to the installed Node executable.');
 $directory = sys_get_temp_dir() . '/postslop-browser-' . bin2hex(random_bytes(6));
 $sessions = new SessionStore($directory . '/sessions.json');
