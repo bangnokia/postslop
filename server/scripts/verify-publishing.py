@@ -3,6 +3,7 @@
 import base64
 import json
 import os
+import time
 from pathlib import Path
 import urllib.error
 import urllib.request
@@ -32,16 +33,27 @@ def request(url, data=None, authenticated=False):
 def counts():
     return {platform: len(request(simulation + '/' + platform + '/__stats')[1]['posts']) for platform in ['x', 'bluesky', 'dev-null']}
 
+def completed(result):
+    deadline = time.monotonic() + 120
+    while result['status'] in ('queued', 'publishing'):
+        assert time.monotonic() < deadline, ('Queue workers did not finish the post', result)
+        time.sleep(0.1)
+        code, result = request(app + '/api/v1/posts/' + result['id'], authenticated=True)
+        assert code == 200, result
+    return result
+
 for platform in ['x', 'bluesky', 'dev-null']:
     code, result = request(simulation + '/' + platform + '/__reset', {})
     assert code == 200, (platform, code, result)
 code, result = request(app + '/api/v1/accounts', authenticated=True)
 assert code == 200 and all(item['available'] for item in result['platforms']), result
-assert {item['id']: item['handle'].lstrip('@') for item in result['platforms']} == {'x': 'tester', 'bluesky': 'tester.test', 'dev-null': 'tester'}, 'Refusing to publish fixture posts to non-fixture accounts'
+assert {item['id']: item['handle'].lstrip('@') for item in result['platforms']} == {'x': 'tester', 'bluesky': 'tester.test', 'dev-null': 'tester', 'linkedin': 'tester', 'threads': 'tester'}, 'Refusing to publish fixture posts to non-fixture accounts'
 image = {'mimeType': 'image/png', 'alt': 'A one-pixel fixture image', 'data': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII='}
 post = {'requestId': str(uuid.uuid4()), 'text': 'Postslop local simulation: image contract', 'platforms': ['x', 'bluesky', 'dev-null'], 'images': [image]}
 code, result = request(app + '/api/v1/posts', post, True)
-assert code == 200 and result['status'] == 'published', result
+assert code == 200 and result['status'] == 'publishing', result
+result = completed(result)
+assert result['status'] == 'published', result
 assert counts() == {'x': 1, 'bluesky': 1, 'dev-null': 1}, counts()
 _, x_state = request(simulation + '/x/__stats')
 _, bsky_state = request(simulation + '/bluesky/__stats')
@@ -57,7 +69,9 @@ code, invalid = request(app + '/api/v1/posts', {**post, 'requestId': str(uuid.uu
 assert code == 422 and counts() == {'x': 1, 'bluesky': 1, 'dev-null': 1}, invalid
 uncertain = {'requestId': str(uuid.uuid4()), 'text': '[simulate:unknown] accepted but response lost', 'platforms': ['x'], 'images': []}
 code, unknown = request(app + '/api/v1/posts', uncertain, True)
-assert code == 200 and unknown['status'] == 'unknown', unknown
+assert code == 200 and unknown['status'] == 'publishing', unknown
+unknown = completed(unknown)
+assert unknown['status'] == 'unknown', unknown
 code, repeated_unknown = request(app + '/api/v1/posts', uncertain, True)
 assert code == 200 and repeated_unknown == unknown and counts()['x'] == 2, repeated_unknown
 print('PASS: authenticated accounts; image and alt text on all three destinations; duplicate suppression; conflicting request IDs; invalid images; uncertain write without retry.')

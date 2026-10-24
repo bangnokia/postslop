@@ -6,7 +6,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "setup": "playwright install firefox",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test ../tests/browser/*.test.mjs"
   },
   "dependencies": {
     "playwright": "1.64.1"

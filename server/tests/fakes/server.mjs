@@ -8,7 +8,7 @@
 // Every site also answers /__reset and /__stats.
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { xFixture } from '../../browser-worker/test/fixture.mjs';
+import { xFixture } from './x-browser.mjs';
 
 const require = createRequire(import.meta.url);
 const option = (name) => process.argv.find((word) => word.startsWith(`--${name}`))?.split('=')[1];

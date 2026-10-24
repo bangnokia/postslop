@@ -17,7 +17,7 @@ final readonly class PostRunDue extends CliCommand
     public function description(): string
     {
         return <<<'TEXT'
-            Publish the scheduled posts that are due now; the schedule in `serve` does this every minute
+            Publish the scheduled posts that are due now; the schedule in `start` does this every minute
             Usage: postslop run-due [--json]
             TEXT;
     }

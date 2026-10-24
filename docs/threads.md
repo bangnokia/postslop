@@ -20,7 +20,7 @@ bin/postslop post "Tomorrow's post" --to=threads --at="tomorrow 9am"
 
 For a remote Postslop, run setup on the computer with the browser and add `--to=https://YOUR_SERVER --token=TOKEN`. This uses the existing account-import API. The session stays in that Postslop's private `storage/sessions.json`. No Meta developer account, access token or new browser worker is required for the Threads integration.
 
-Select Threads in either composer once its account is available. Postslop supports a 500-character post and up to four images, or three when also sending to dev-null.sh. Scheduled posts use the `threads` queue and worker under `postslop serve`. Restart a running server after installing this change so it starts that worker.
+Select Threads in either composer once its account is available. Postslop supports a 500-character post and up to four images, or three when also sending to dev-null.sh. Scheduled posts use the `threads` queue and worker under `postslop start`. Restart a running server after installing this change so it starts that worker.
 
 ## Results and limitations
 

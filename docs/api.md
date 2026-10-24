@@ -11,7 +11,7 @@ draft ──▶ scheduled ──▶ publishing ──▶ published | partial | f
   └─────────────────────────▲   (publish now)
 ```
 
-Publishing never makes a request wait on the sites. `mode: "now"` and `POST …/publish` answer at once with the post `publishing` and each result `queued`. Every site has its own queue and worker in `postslop serve`, so the sites are sent at the same time, each one post after another. A result goes `queued`, then `sending`, then its outcome. Poll `GET /api/v1/posts/{id}` until the status is no longer `queued` or `publishing`. A post on its way can no longer be edited or deleted. A result still `queued` after 15 minutes was never sent and becomes `failed`; one left `sending` by a crash becomes `unknown`. (`queued` as a post's status comes only from earlier versions.)
+Publishing never makes a request wait on the sites. `mode: "now"` and `POST …/publish` answer at once with the post `publishing` and each result `queued`. Every site has its own queue and worker in `postslop start`, so the sites are sent at the same time, each one post after another. A result goes `queued`, then `sending`, then its outcome. Poll `GET /api/v1/posts/{id}` until the status is no longer `queued` or `publishing`. A post on its way can no longer be edited or deleted. A result still `queued` after 15 minutes was never sent and becomes `failed`; one left `sending` by a crash becomes `unknown`. (`queued` as a post's status comes only from earlier versions.)
 
 A post is one piece of content for one or more destinations. Each destination has its own result: `published`, `failed` or `unknown`. The post's status adds them up: `published` when every destination published, `partial` when some did, `unknown` when any outcome is unknown, otherwise `failed`.
 

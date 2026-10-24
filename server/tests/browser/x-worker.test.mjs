@@ -7,8 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { runWorker } from '../x-worker.mjs';
-import { xFixture } from './fixture.mjs';
+import { runWorker } from '../../browser-worker/x-worker.mjs';
+import { xFixture } from '../fakes/x-browser.mjs';
 
 process.env.POSTSLOP_TEST_MODE = '1';
 const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB1cAAAAASUVORK5CYII=', 'base64');
@@ -64,7 +64,7 @@ test('CLI preserves an emoji split between UTF-8 stdin chunks', async () => {
     const text = 'Clipboard photo 🦀 with UTF-8';
     const payload = Buffer.from(JSON.stringify({ ...input, text }));
     const split = payload.indexOf(Buffer.from('🦀')) + 2;
-    const child = spawn(process.execPath, [fileURLToPath(new URL('../x-worker.mjs', import.meta.url))], {
+    const child = spawn(process.execPath, [fileURLToPath(new URL('../../browser-worker/x-worker.mjs', import.meta.url))], {
       env: { ...process.env, POSTSLOP_TEST_MODE: '1' }, stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '';

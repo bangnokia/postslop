@@ -2,6 +2,7 @@
 """Verify the real PHP -> background browser flow against the local website mock."""
 import json
 import os
+import time
 from pathlib import Path
 import urllib.request
 import uuid
@@ -29,6 +30,12 @@ request = {'requestId': str(uuid.uuid4()), 'text': 'Postslop background browser 
 }]}
 before = len(posts())
 result = call('/api/v1/posts', request)
+assert result['status'] == 'publishing', result
+deadline = time.monotonic() + 120
+while result['status'] in ('queued', 'publishing'):
+    assert time.monotonic() < deadline, ('Queue workers did not finish the post', result)
+    time.sleep(0.1)
+    result = call('/api/v1/posts/' + result['id'])
 assert result['status'] == 'published', result
 created = posts()
 assert len(created) == before + 1, 'The browser submitted more than once'

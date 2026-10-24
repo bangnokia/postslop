@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4655c633c2a9a39711fca0a33401160b",
+    "content-hash": "28ec4aa2161281d5a44d2599dff53318",
     "packages": [
         {
             "name": "crabphp/framework",
@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/crabphp/framework.git",
-                "reference": "daf0aacb13d43bc0710025b9f3ed97b6111f776c"
+                "reference": "a919c3079d7ff1677615965e4967aa0cafd154a7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/crabphp/framework/zipball/daf0aacb13d43bc0710025b9f3ed97b6111f776c",
-                "reference": "daf0aacb13d43bc0710025b9f3ed97b6111f776c",
+                "url": "https://api.github.com/repos/crabphp/framework/zipball/a919c3079d7ff1677615965e4967aa0cafd154a7",
+                "reference": "a919c3079d7ff1677615965e4967aa0cafd154a7",
                 "shasum": ""
             },
             "require": {
@@ -107,7 +107,7 @@
                 "source": "https://github.com/crabphp/framework/tree/main",
                 "issues": "https://github.com/crabphp/framework/issues"
             },
-            "time": "2026-10-20T04:35:14+00:00"
+            "time": "2026-10-24T10:22:40+00:00"
         },
         {
             "name": "psr/clock",

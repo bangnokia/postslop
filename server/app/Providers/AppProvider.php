@@ -68,7 +68,7 @@ final class AppProvider implements Provider
                 ['x' => config('postslop.x_browser_profile')],
             );
         });
-        // `serve` runs the schedule and the queue when SERVER_SCHEDULE and SERVER_QUEUE are on.
+        // `start` runs the schedule and the queue when SERVER_SCHEDULE and SERVER_QUEUE are on.
         $container->get(Schedule::class)->job(PublishDuePosts::class);
     }
 }

@@ -6,6 +6,10 @@
 - A CLI post is a draft unless `--now` or a scheduled time is given explicitly, so AI agents never publish by default.
 - Build the web client with Vite, React and TypeScript in `clients/web`; it builds into `server/public`, which is not committed.
 - Test against the plain Node fake sites in `server/tests/fakes`, never real accounts; do not reintroduce Postman.
+- Keep server tests in `server/tests/`, including browser worker tests; `composer test` runs them from the repository root.
+- Use `composer cua -- describe` to inspect the application's routes, commands, schedule, servers, databases and settings. After changing `server/config/` or `.env`, run `composer cua -- describe app` and fix every invalid setting before starting it.
+- Keep request data out of long-lived services and static properties; workers reuse them. Make queued jobs safe to run more than once.
+- Use `composer dev` for watched development and `composer start` for production in the background. The CLI equivalents are `postslop dev` and `postslop start --daemon`; production never watches files.
 - Use a versioned CrabPHP Composer dependency pinned by `composer.lock`; never depend on a local framework directory or path repository.
 - Use the user's local browser sessions for X, Bluesky, dev-null.sh, LinkedIn, and Threads; do not require social API keys.
 - An explicit click on Publish submits immediately without a second confirmation once publishing is implemented.
@@ -27,7 +31,7 @@
 - Prefer the smallest change that fixes a proven cause; avoid speculative code.
 - Use the session's native computer-use tool for desktop inspection; do not launch Orca unless explicitly requested.
 - Share clean destination URLs; remove all `utm_*` parameters and do not add campaign tracking parameters.
-- Publish scheduled posts through CrabPHP's own schedule and queue run by `serve`, never an OS crontab or launchd job.
+- Publish scheduled posts through CrabPHP's own schedule and queue run by `start`, never an OS crontab or launchd job.
 - Postslop may be installed on another machine: do not restrict the HTTP API to localhost; protect it with the access token (a password), `POSTSLOP_TOKEN` in `server/.env`, not a file in storage, entered once in the web client; with no token set, the web client and API are public.
 - Keep the web client responsive: publishing now over the HTTP API queues the post and answers at once; the queue workers send it, and the client frees the composer and polls for the result. The CLI's `--now` stays synchronous for agents.
 - Give every site its own queue, worker and lock, so one post is sent to all its sites at the same time while each site gets one post at a time.

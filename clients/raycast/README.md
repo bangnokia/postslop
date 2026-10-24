@@ -1,6 +1,6 @@
 # Postslop for Raycast
 
-Search **Postslop** in Raycast to open a fresh **New Post** composer without opening a separate app. Previous drafts and results are preserved in **Saved Posts**. The extension runs Postslop's command line, `server/bin/postslop`, so no server needs to be running. It can instead post through a Postslop on another machine: see [Local or server](#local-or-server). The web client, with history and scheduling, is at <http://127.0.0.1:8087> after `postslop serve`.
+Search **Postslop** in Raycast to open a fresh **New Post** composer without opening a separate app. Previous drafts and results are preserved in **Saved Posts**. The extension runs Postslop's command line, `server/bin/postslop`, so no server needs to be running. It can instead post through a Postslop on another machine: see [Local or server](#local-or-server). The web client, with history and scheduling, is at <http://127.0.0.1:8087> after `postslop start`.
 
 ## Install locally
 

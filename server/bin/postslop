@@ -26,7 +26,7 @@ $arguments = array_slice($argv, 1);
 $name = $arguments[0] ?? null;
 if ($name === null || in_array($name, ['help', '--help', '-h'], true) && !isset($arguments[1])) {
     echo <<<'TEXT'
-        Postslop: write once, publish to X, Bluesky, dev-null.sh and LinkedIn.
+        Postslop: write once, publish to X, Bluesky, dev-null.sh, LinkedIn and Threads.
 
           postslop setup [SITE]          Import your signed-in sessions from Chrome (or --browser=firefox);
                                          add --to=URL to send them to Postslop on another machine
@@ -39,7 +39,10 @@ if ($name === null || in_array($name, ['help', '--help', '-h'], true) && !isset(
           postslop schedule ID --at=TIME Schedule or reschedule a draft
           postslop retry ID              Retry only the destinations that failed
           postslop delete ID             Delete a draft or scheduled post
-          postslop serve                 Serve the web client and API, and publish scheduled posts on time
+          postslop dev                   Develop with automatic restarts when files change; Ctrl+C stops it
+          postslop start [--daemon]      Run the web client, API, schedule and queues without watching files
+          postslop stop|reload|restart   Manage the background server
+          postslop status [--json]       Show all running servers and per-worker activity
 
         Add --json for machine-readable output, and --help to any command for its options.
         Exit codes: 0 ok, 2 invalid, 3 partly published, 4 failed, 5 unknown outcome, 6 busy, 7 conflict, 8 not found.

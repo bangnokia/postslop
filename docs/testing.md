@@ -33,11 +33,14 @@ POSTSLOP_BLUESKY_URL=http://127.0.0.1:4900/bluesky \
 POSTSLOP_DEV_NULL_URL=http://127.0.0.1:4900/dev-null \
 POSTSLOP_LINKEDIN_URL=http://127.0.0.1:4900/linkedin \
 POSTSLOP_THREADS_URL=http://127.0.0.1:4900/threads \
+SERVER_QUEUE=true SERVER_SCHEDULE=true \
 CACHE_STORE=array APP_URL=http://127.0.0.1:8091 SERVER_ADDRESS=tcp://127.0.0.1:8091 \
-sh -c 'php cua migrate && php cua serve --single --no-watch'
+sh -c 'php cua migrate && php cua start'
 ```
 
-Then `python3 scripts/verify-publishing.py` checks identity, multipart image uploads, alt text, a three-destination post, a repeated request ID, conflicting content, invalid image bytes, and an X server error after it accepted a post. That last one must stay `unknown`, and repeating it must not post again.
+This runs HTTP, the scheduler and each site's queue worker. For HTTP alone, use `php cua start --single`; publishing checks also need `php cua queue:work` in another terminal with the same environment. `php cua dev` watches and restarts during development; `start` never watches. `php cua describe app` checks settings, and `php cua status --json` reports running servers and worker activity.
+
+Then `python3 scripts/verify-publishing.py` checks identity, image uploads, alt text, a three-destination post, a repeated request ID, conflicting content, invalid image bytes, and an X server error after it accepted a post. It waits for queued posts to finish. That last one must stay `unknown`, and repeating it must not post again.
 
 The same environment variables point `bin/postslop` at the fakes, so the command line can be checked the same way without a server.
 

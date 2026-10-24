@@ -139,7 +139,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError("Postslop is not reachable. Start it with: postslop serve", "offline", 0);
+    throw new ApiError("Postslop is not reachable. Start it with: postslop start", "offline", 0);
   }
   if (response.status === 401) signOut();
   if (response.status === 204) return undefined as T;

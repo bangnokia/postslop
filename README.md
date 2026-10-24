@@ -9,7 +9,7 @@ Write once and publish text and images to **X, Bluesky, dev-null.sh, LinkedIn an
                                Core (server/app/Core) ── SQLite, sessions, images
                                        ▲
  web client ──▶ /api/v1 (HTTP) ────────┤
- schedule ──▶ queue (postslop serve) ──┘
+ schedule ──▶ queue (postslop start) ──┘
 ```
 
 One core holds every rule: drafts, scheduling, history, and never posting the same thing twice. It has two front doors. The **command line** runs the core directly, so Raycast and AI agents need no server running. The **HTTP API** serves the web client, and Raycast when Postslop runs on another machine.
@@ -41,15 +41,20 @@ To call it as `postslop` from anywhere, link it onto your path from the reposito
 ## Root commands
 
 ```sh
-composer start                # start in the background
-composer server:status        # inspect the background server
+composer start                # production server in the background; never watches
+composer server:status        # all running servers and per-worker activity
+composer server:status -- --json
 composer reload               # load updated code while keeping the listening socket
 composer restart              # stop and start again
 composer stop                 # gracefully stop the background server
-composer serve                # foreground development server; Ctrl+C stops it
+composer dev                  # restart on file changes; Ctrl+C stops it
 ```
 
-These use `server/.env` and the same CrabPHP server commands as before. The schedule and queues start when `SERVER_SCHEDULE` and `SERVER_QUEUE` are enabled. Background servers do not watch files; use `composer reload` after changes. `stop`, `reload`, `restart` and `server:status` manage the background server started by `composer start`; stop a foreground `composer serve` with Ctrl+C. Composer's built-in `status` command is unrelated, hence `server:status`.
+These use `server/.env`. The schedule and queues start when `SERVER_SCHEDULE` and `SERVER_QUEUE` are enabled. `dev` watches files and restarts automatically; `start` never watches, including in the foreground, and refuses `--watch` and `--no-watch`. Use `composer reload` to load production changes. `stop`, `reload` and `restart` manage the background server; stop a foreground server with Ctrl+C. `server:status` lists foreground and background servers, queue workers and schedulers, with per-worker requests, jobs and runs. It exits with 0 when any server is running, or 1 when none is. Composer's built-in `status` command is unrelated, hence `server:status`.
+
+With the current framework pin, repeat any startup `--address` and `--workers` overrides on `composer reload -- …` and `composer restart -- …`. Automatic preservation of those overrides is pending upstream.
+
+Run `composer cua -- describe` to inspect the application, or `composer cua -- describe app` to check settings after editing configuration. Invalid settings, including unknown keys in framework sections, prevent startup, reload and queue workers. The SQLite database defaults to `server/storage/database.sqlite`; `DB_DATABASE` changes its path, and an existing `DB_DSN` still overrides the connection. The default connection's migrations live in `server/database/migrations`.
 
 | Command | Purpose |
 | --- | --- |
@@ -89,7 +94,8 @@ postslop post "Hello" --at="tomorrow 9am"  # schedule (local time)
 postslop post "Look" --image=shot.png --to=x,bluesky --now
 postslop posts --status=scheduled          # history, newest first
 postslop show ID | publish ID | retry ID | schedule ID --at=… | delete ID
-postslop serve                             # web client, API, schedule and queue
+postslop dev                               # development with file watching
+postslop start --daemon                    # web client, API, schedule and queues in the background
 ```
 
 **A post is a draft unless you say `--now` or give a time.** So an AI agent can prepare posts safely, and nothing goes public without an explicit flag. `postslop help post` lists every option.
@@ -98,11 +104,11 @@ For scripts and agents, every command takes `--json` and prints exactly one JSON
 
 ### Scheduling
 
-`postslop serve` runs CrabPHP's schedule and queue beside the web server when `SERVER_SCHEDULE` and `SERVER_QUEUE` are on in `.env`; no OS cron or launchd job is involved. Every minute the schedule pushes a `PublishDuePosts` job onto the queue (the `jobs` table), which hands each due post's destinations to the sites' own queues. Each site, `x`, `bluesky`, `dev-null`, `linkedin` and `threads`, has its own queue and worker (`config/queue.php`) and its own lock (`storage/publishing-x.lock` and so on), so one post goes to every site at the same time while a site never gets two posts at once. A repeated or retried job is harmless because the core never publishes a delivery twice. `php cua schedule:list` shows the task and `php cua queue:failed` shows jobs that gave up. `postslop run-due` still publishes due posts by hand.
+`postslop start` runs CrabPHP's schedule and queue beside the web server when `SERVER_SCHEDULE` and `SERVER_QUEUE` are on in `.env`; no OS cron or launchd job is involved. Every minute the schedule pushes a `PublishDuePosts` job onto the queue (the `jobs` table), which hands each due post's destinations to the sites' own queues. Each site, `x`, `bluesky`, `dev-null`, `linkedin` and `threads`, has its own queue and worker (`config/queue.php`) and its own lock (`storage/publishing-x.lock` and so on), so one post goes to every site at the same time while a site never gets two posts at once. A repeated or retried job is harmless because the core never publishes a delivery twice. `php cua schedule:list` shows the task and `php cua queue:failed` shows jobs that gave up. `postslop run-due` still publishes due posts by hand.
 
 ## Web client
 
-`postslop serve` (or `php cua serve --daemon` in `server/`) serves the built client at `SERVER_ADDRESS` (<http://127.0.0.1:8087> by default) and asks for the access token once:
+`composer start` (or `php cua start --daemon` in `server/`) serves the built client at `SERVER_ADDRESS` (<http://127.0.0.1:8087> by default) and asks for the access token once:
 
 - **Sidebar**: new post (or press <kbd>C</kbd>), the calendar, posts by status with counts, each account's state, and light, dark or system theme.
 - **Calendar**: a month grid and a week by the hour. Click a free day or hour to write a post scheduled for then; click a post to open it.

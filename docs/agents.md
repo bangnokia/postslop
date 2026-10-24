@@ -14,7 +14,7 @@ Postslop posts one piece of writing to X, Bluesky, dev-null.sh, LinkedIn and Thr
 | Where the agent runs | Use |
 | --- | --- |
 | On the machine with Postslop | The command line, `postslop` (or `server/bin/postslop`). It needs no server. |
-| Anywhere else | The HTTP API of a running `postslop serve`, with `Authorization: Bearer <token>`. See [api.md](api.md). |
+| Anywhere else | The HTTP API of a running `postslop start`, with `Authorization: Bearer <token>`. See [api.md](api.md). |
 
 The two follow the same rules. The rest of this page uses the command line; the API section at the end maps each step.
 
