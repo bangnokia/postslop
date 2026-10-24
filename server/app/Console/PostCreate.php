@@ -23,7 +23,7 @@ final readonly class PostCreate extends CliCommand
     {
         return <<<'TEXT'
             Write a post: saved as a draft unless --now or --at says otherwise
-            Usage: postslop post "Text" [--to=x,bluesky,dev-null,linkedin] [--image=a.png,b.png] [--now | --at=TIME]
+            Usage: postslop post "Text" [--to=x,bluesky,dev-null,linkedin,threads] [--image=a.png,b.png] [--now | --at=TIME]
             Options:
               --to=LIST          Destinations, comma separated (default: every account set up and turned on)
               --image=LIST       JPEG, PNG or WebP files of at most 1 MiB, comma separated

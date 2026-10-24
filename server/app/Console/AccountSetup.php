@@ -22,6 +22,7 @@ final readonly class AccountSetup extends CliCommand
         'bluesky' => 'Bluesky',
         'dev-null' => 'dev-null.sh',
         'linkedin' => 'LinkedIn',
+        'threads' => 'Threads',
     ];
 
     public function __construct(
@@ -33,9 +34,10 @@ final readonly class AccountSetup extends CliCommand
     public function description(): string
     {
         return <<<'TEXT'
-            Import your signed-in X, Bluesky, dev-null.sh and LinkedIn sessions from Chrome or Firefox
-            Usage: postslop setup [x] [bluesky] [dev-null] [linkedin] [--browser=chrome|firefox] [--x=HANDLE]
-                                  [--bluesky=HANDLE] [--dev-null=HANDLE] [--linkedin=HANDLE] [--profile=DIR] [--to=URL --token=TOKEN]
+            Import your signed-in X, Bluesky, dev-null.sh, LinkedIn and Threads sessions from Chrome or Firefox
+            Usage: postslop setup [x] [bluesky] [dev-null] [linkedin] [threads] [--browser=chrome|firefox] [--x=HANDLE]
+                                  [--bluesky=HANDLE] [--dev-null=HANDLE] [--linkedin=HANDLE] [--threads=HANDLE]
+                                  [--profile=DIR] [--to=URL --token=TOKEN]
             Name sites to import only those; with none, each site's handle is asked for, and an empty
             answer skips that site. First check in the
             browser which account is signed in on each site. Postslop refuses a session that belongs
@@ -43,7 +45,7 @@ final readonly class AccountSetup extends CliCommand
             Options:
               --browser=NAME chrome (default) or firefox. Chrome asks macOS once for
                              "Chrome Safe Storage" to decrypt its cookies: choose Allow
-              --x=HANDLE, --bluesky=HANDLE, --dev-null=HANDLE, --linkedin=HANDLE
+              --x=HANDLE, --bluesky=HANDLE, --dev-null=HANDLE, --linkedin=HANDLE, --threads=HANDLE
                              The account signed in on each site; asked for when left out. LinkedIn's
                              handle is the name in your profile address, linkedin.com/in/NAME
               --profile=DIR  The profile folder (default: the browser's last used or default profile)
@@ -72,7 +74,9 @@ final readonly class AccountSetup extends CliCommand
         $sites = $input->arguments() === [] ? array_keys(self::SITES) : array_values(array_unique($input->arguments()));
         foreach ($sites as $site) {
             if (!array_key_exists($site, self::SITES)) {
-                throw Failure::invalid('There is no ' . $site . ' site. Name x, bluesky, dev-null or linkedin.');
+                throw Failure::invalid(
+                    'There is no ' . $site . ' site. Name x, bluesky, dev-null, linkedin or threads.',
+                );
             }
         }
         $remote = self::remote($input);

@@ -123,6 +123,14 @@ export function PlatformIcon({ platform, size = 20 }: { platform: Platform; size
         </svg>
       </span>
     );
+  if (platform === "threads")
+    return (
+      <span className="platform platform-threads" style={style} aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 7C18.8 3.8 16.2 2 12.1 2 6.1 2 3 5.9 3 12s3.1 10 9.1 10c5 0 8.4-2.8 8.4-6.5 0-3.4-2.9-5.3-7.4-5.3-3.3 0-5.1 1.5-5.1 3.6 0 1.9 1.4 3 3.3 3 2.7 0 4.3-2 4.3-5.7 0-3.2-1.3-5-3.8-5-1.7 0-3 .8-3.7 2" />
+        </svg>
+      </span>
+    );
   // dev-null.sh's own mark, from https://dev-null.sh/favicon.svg.
   return (
     <span className="platform platform-dev-null" style={style} aria-hidden="true">

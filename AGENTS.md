@@ -7,7 +7,7 @@
 - Build the web client with Vite, React and TypeScript in `clients/web`; it builds into `server/public`, which is not committed.
 - Test against the plain Node fake sites in `server/tests/fakes`, never real accounts; do not reintroduce Postman.
 - Use a versioned CrabPHP Composer dependency pinned by `composer.lock`; never depend on a local framework directory or path repository.
-- Use the user's local browser sessions for X, Bluesky, dev-null.sh, and LinkedIn; do not require social API keys.
+- Use the user's local browser sessions for X, Bluesky, dev-null.sh, LinkedIn, and Threads; do not require social API keys.
 - An explicit click on Publish submits immediately without a second confirmation once publishing is implemented.
 - After a fully successful publish, automatically clear the composer UI and saved draft, including text and attachments; retain drafts for failed or uncertain results.
 - All publishing and retries must run through Postslop; do not manually publish through Chrome or another site's composer.

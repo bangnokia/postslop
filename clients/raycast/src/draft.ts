@@ -12,13 +12,20 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-export const platforms = ["x", "bluesky", "dev-null", "linkedin"] as const;
+export const platforms = [
+  "x",
+  "bluesky",
+  "dev-null",
+  "linkedin",
+  "threads",
+] as const;
 export type Platform = (typeof platforms)[number];
 export const platformNames: Record<Platform, string> = {
   x: "X",
   bluesky: "Bluesky",
   "dev-null": "dev-null.sh",
   linkedin: "LinkedIn",
+  threads: "Threads",
 };
 
 export interface Attachment {
@@ -139,9 +146,14 @@ export function cleanPostURL(value?: string): string | undefined {
     const url = new URL(value);
     if (
       url.protocol !== "https:" ||
-      !["x.com", "bsky.app", "dev-null.sh", "www.linkedin.com"].includes(
-        url.hostname,
-      )
+      ![
+        "x.com",
+        "bsky.app",
+        "dev-null.sh",
+        "www.linkedin.com",
+        "www.threads.com",
+        "threads.com",
+      ].includes(url.hostname)
     )
       return;
     for (const key of [...url.searchParams.keys()])

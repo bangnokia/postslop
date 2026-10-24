@@ -1,6 +1,6 @@
 # Postslop for AI agents
 
-Postslop posts one piece of writing to X, Bluesky, dev-null.sh and LinkedIn, with the user's own signed-in accounts. This page tells an AI agent how to use it safely. Hand it to the agent as is.
+Postslop posts one piece of writing to X, Bluesky, dev-null.sh, LinkedIn and Threads, with the user's own signed-in accounts. Threads support is experimental; see [its setup notes](threads.md). This page tells an AI agent how to use it safely. Hand it to the agent as is.
 
 ## Ground rules
 
@@ -26,7 +26,7 @@ The two follow the same rules. The rest of this page uses the command line; the 
 postslop accounts --json
 ```
 
-Use only platforms with `"available": true`. For the others, tell the user the `reason` (for example "Not connected. Run: postslop setup linkedin"); do not try to fix sessions yourself. Each platform gives `textLimit` (X 280, Bluesky 300, dev-null.sh 4000, LinkedIn 3000) and `maxImages` (4, or 3 for dev-null.sh). Write to the smallest limit among the destinations, or make one post per site.
+Use only platforms with `"available": true`. For the others, tell the user the `reason` (for example "Not connected. Run: postslop setup threads"); do not try to fix sessions yourself. Each platform gives `textLimit` (X 280, Bluesky 300, dev-null.sh 4000, LinkedIn 3000, Threads 500) and `maxImages` (4, or 3 for dev-null.sh). Write to the smallest limit among the destinations, or make one post per site.
 
 ### 2. Check the post without saving it
 

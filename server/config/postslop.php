@@ -21,4 +21,5 @@ return [
     'bluesky_url' => env('POSTSLOP_BLUESKY_URL', ''),
     'dev_null_url' => env('POSTSLOP_DEV_NULL_URL', 'https://dev-null.sh'),
     'linkedin_url' => env('POSTSLOP_LINKEDIN_URL', 'https://www.linkedin.com'),
+    'threads_url' => env('POSTSLOP_THREADS_URL', 'https://www.threads.com'),
 ];

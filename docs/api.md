@@ -69,7 +69,7 @@ Each of these answers with the accounts, as `GET /api/v1/accounts?refresh=1` doe
 - `DELETE /api/v1/accounts/{site}` forgets the account: its session and, for X, its background browser profile. Its posts stay.
 - `PUT /api/v1/accounts/{site}` with `{"handle": "example", "session": {"cookies": [...], "origins": [...]}, "source": "firefox"}` saves a session, turned on, and checks it signs in. `postslop setup --to=URL` sends this from the machine with the browser; clients do not build sessions themselves.
 
-`{site}` is `x`, `bluesky`, `dev-null` or `linkedin`; another answers `404`.
+`{site}` is `x`, `bluesky`, `dev-null`, `linkedin` or `threads`; another answers `404`.
 
 ## Write a post — `POST /api/v1/posts`
 
@@ -86,7 +86,7 @@ Each of these answers with the accounts, as `GET /api/v1/accounts?refresh=1` doe
 
 - `requestId`: lowercase UUID, optional (one is made when left out). Reuse it when recovering from a lost response.
 - `text`: UTF-8, at most 3,000 characters; may be empty when images are attached.
-- `platforms`: one to four distinct IDs of `x`, `bluesky`, `dev-null`, `linkedin`.
+- `platforms`: one to five distinct IDs of `x`, `bluesky`, `dev-null`, `linkedin`, `threads`.
 - `images`: at most four, three with dev-null.sh. Each JPEG, PNG or WebP is at most 1 MiB and 40 megapixels, and its declared type must match its bytes. Alt text is optional, at most 1,000 characters.
 - `mode`: `now` publishes, `draft` saves, `schedule` saves for `scheduledAt` (an ISO 8601 time in the future). Defaults to `schedule` when `scheduledAt` is given, otherwise `now`.
 

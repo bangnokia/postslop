@@ -34,6 +34,7 @@ assert.deepEqual(
     bluesky: "tester.test",
     "dev-null": "tester",
     linkedin: "tester",
+    threads: "tester",
   },
   "Refusing to send fixture posts to real accounts",
 );
@@ -61,7 +62,7 @@ assert.equal(statSync(image.path).mode & 0o777, 0o600);
 async function counts() {
   return Object.fromEntries(
     await Promise.all(
-      ["x", "bluesky", "dev-null", "linkedin"].map(async (id) => {
+      ["x", "bluesky", "dev-null", "linkedin", "threads"].map(async (id) => {
         const response = await fetch(`${simulation}/${id}/__stats`);
         assert(response.ok);
         return [id, (await response.json()).posts.length];

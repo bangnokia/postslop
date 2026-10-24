@@ -23,6 +23,7 @@ assert.deepEqual(
     bluesky: "tester.test",
     "dev-null": "tester",
     linkedin: "tester",
+    threads: "tester",
   },
 );
 const store = new DraftStore(

@@ -11,6 +11,7 @@ use App\Social\BlueskyPublisher;
 use App\Social\DevNullPublisher;
 use App\Social\LinkedInPublisher;
 use App\Social\SessionStore;
+use App\Social\ThreadsPublisher;
 use App\Social\XBrowserPublisher;
 use App\Social\XPublisher;
 use Crab\Contracts\Cache\Cache;
@@ -56,6 +57,7 @@ final class AppProvider implements Provider
                     'bluesky' => new BlueskyPublisher($http, $sessions),
                     'dev-null' => new DevNullPublisher($http, $sessions),
                     'linkedin' => new LinkedInPublisher($http, $sessions),
+                    'threads' => new ThreadsPublisher($http, $sessions),
                 ],
                 $container->get(Database::class),
                 $container->get(Cache::class),

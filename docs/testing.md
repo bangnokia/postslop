@@ -1,6 +1,6 @@
 # Testing against fake sites
 
-`server/tests/fakes/` holds stand-ins for X, Bluesky, dev-null.sh and LinkedIn with fake accounts and no real cookies. They were written from the sites' observed web requests: X's web bundles, Bluesky's session and PDS responses, dev-null.sh's Inertia forms, and LinkedIn's Voyager media upload and share requests. They prove wiring and error handling, not that a real site will accept a post, and they cannot predict a site's bot checks. Never deploy them.
+`server/tests/fakes/` holds stand-ins for X, Bluesky, dev-null.sh, LinkedIn and Threads with fake accounts and no real cookies. The Threads fixture models the [documented protocol references](threads.md#protocol-reference) for account checks, image uploads and post configuration. The other fixtures model X's web bundles, Bluesky's session and PDS responses, dev-null.sh's Inertia forms, and LinkedIn's Voyager media upload and share requests. They prove wiring and error handling, not that a real site will accept a post, and they cannot predict a site's bot checks. Never deploy them.
 
 Every check below uses `storage/test-*` paths and its own database, never your sessions or history. Run the commands from `server/`.
 
@@ -11,7 +11,9 @@ python3 scripts/prepare-simulation.py
 node tests/fakes/server.mjs --port=4900
 ```
 
-The sites answer under `/x`, `/bluesky` and `/dev-null`, each with `/__reset` and `/__stats`. `--browser` serves X's website composer for the background browser worker instead of its HTTP API.
+The sites answer under `/x`, `/bluesky`, `/dev-null`, `/linkedin` and `/threads`, each with `/__reset` and `/__stats`. `--browser` serves X's website composer for the background browser worker instead of its HTTP API.
+
+`php tests/threads.php` starts its own fake server and temporary database. It covers text, single images, carousels, descriptions, account mismatches, expired sessions, failed uploads, rejected and uncertain writes, duplicate protection, the Threads queue, HTTP account management, and draft-by-default CLI behavior. It never reads personal sessions.
 
 ## The HTTP API
 
@@ -30,6 +32,7 @@ POSTSLOP_X_BUNDLE_URL=http://127.0.0.1:4900/x/main.js \
 POSTSLOP_BLUESKY_URL=http://127.0.0.1:4900/bluesky \
 POSTSLOP_DEV_NULL_URL=http://127.0.0.1:4900/dev-null \
 POSTSLOP_LINKEDIN_URL=http://127.0.0.1:4900/linkedin \
+POSTSLOP_THREADS_URL=http://127.0.0.1:4900/threads \
 CACHE_STORE=array APP_URL=http://127.0.0.1:8091 SERVER_ADDRESS=tcp://127.0.0.1:8091 \
 sh -c 'php cua migrate && php cua serve --single --no-watch'
 ```

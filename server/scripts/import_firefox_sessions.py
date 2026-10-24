@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Import only Postslop's three sites from an explicitly selected Firefox profile.
+"""Import only Postslop's sites from an explicitly selected Firefox profile.
 
 No network requests or browser changes are made. Verify the signed-in identities in
 Firefox before supplying their handles. The sessions are written to stdout for
@@ -19,7 +19,7 @@ import tempfile
 import time
 
 
-DOMAINS = {"x": "x.com", "bluesky": "bsky.app", "dev-null": "dev-null.sh", "linkedin": "linkedin.com"}
+DOMAINS = {"x": "x.com", "bluesky": "bsky.app", "dev-null": "dev-null.sh", "linkedin": "linkedin.com", "threads": "threads.com"}
 MAX_DATABASE_BYTES = 128 * 1024 * 1024
 MAX_LOCAL_STORAGE_BYTES = 8 * 1024 * 1024
 
@@ -275,11 +275,13 @@ def main() -> int:
     parser.add_argument("--bluesky-handle", help="Bluesky handle already verified in Firefox; leave out to skip this site")
     parser.add_argument("--dev-null-handle", help="dev-null.sh handle already verified in Firefox; leave out to skip this site")
     parser.add_argument("--linkedin-handle", help="LinkedIn public profile name already verified in Firefox; leave out to skip this site")
+    parser.add_argument("--threads-handle", help="Threads handle already verified on threads.com in Firefox; leave out to skip this site")
     arguments = parser.parse_args()
     # Only the sites given a handle are imported, so one account can be added or refreshed on its own.
     given = {
         "x": arguments.x_handle, "bluesky": arguments.bluesky_handle, "dev-null": arguments.dev_null_handle,
         "linkedin": arguments.linkedin_handle,
+        "threads": arguments.threads_handle,
     }
     handles = {platform: handle.lstrip("@") for platform, handle in given.items() if handle is not None}
     if not handles:
@@ -305,8 +307,12 @@ def main() -> int:
         raise ImportFailure("The selected Firefox profile has no usable persisted dev-null.sh sign-in.")
     if "linkedin" in handles and not {"li_at", "JSESSIONID"}.issubset({cookie["name"] for cookie in states["linkedin"]["cookies"]}):
         raise ImportFailure("The selected Firefox profile has no usable persisted LinkedIn sign-in.")
-    if "linkedin" in handles and (user_agent := firefox_user_agent(arguments.profile)):
-        states["linkedin"]["userAgent"] = user_agent
+    if "threads" in handles and not {"sessionid", "csrftoken", "ds_user_id"}.issubset({cookie["name"] for cookie in states["threads"]["cookies"] if cookie["value"]}):
+        raise ImportFailure("The selected Firefox profile has no usable persisted threads.com sign-in. Sign in to threads.com first.")
+    if {"linkedin", "threads"}.intersection(handles) and (user_agent := firefox_user_agent(arguments.profile)):
+        for platform in ("linkedin", "threads"):
+            if platform in handles:
+                states[platform]["userAgent"] = user_agent
     if "bluesky" in handles:
         local_storage = read_bluesky_storage(arguments.profile, handles["bluesky"])
         states["bluesky"]["origins"] = [{"origin": "https://bsky.app", "localStorage": local_storage}]

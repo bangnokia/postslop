@@ -22,6 +22,7 @@ export const fixtureEnv = {
   POSTSLOP_BLUESKY_URL: `${fakes}/bluesky`,
   POSTSLOP_DEV_NULL_URL: `${fakes}/dev-null`,
   POSTSLOP_LINKEDIN_URL: `${fakes}/linkedin`,
+  POSTSLOP_THREADS_URL: `${fakes}/threads`,
 };
 export const fakeSites = fakes;
 export const fixtureClient = () => new PostslopClient(server, fixtureEnv);

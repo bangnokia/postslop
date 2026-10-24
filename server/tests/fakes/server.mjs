@@ -1,9 +1,9 @@
-// Fake X, Bluesky, dev-null.sh and LinkedIn on one local port, for publishing checks
+// Fake X, Bluesky, dev-null.sh, LinkedIn and Threads on one local port, for publishing checks
 // that run the real server without touching a real account:
 //
 //   node tests/fakes/server.mjs [--port=4900] [--browser]
 //
-// Each site lives under its own path: /x, /bluesky, /dev-null, /linkedin. --browser serves
+// Each site lives under its own path: /x, /bluesky, /dev-null, /linkedin, /threads. --browser serves
 // X's website composer for the background browser worker instead of its HTTP API.
 // Every site also answers /__reset and /__stats.
 import { createServer } from 'node:http';
@@ -30,6 +30,7 @@ const sites = {
   bluesky: require('./bluesky.cjs'),
   'dev-null': require('./dev-null.cjs'),
   linkedin: require('./linkedin.cjs'),
+  threads: require('./threads.cjs'),
 };
 
 const server = createServer(async (request, response) => {
@@ -37,7 +38,7 @@ const server = createServer(async (request, response) => {
   const handler = sites[site];
   if (!handler) {
     response.writeHead(404, { 'Content-Type': 'application/json' });
-    return response.end(JSON.stringify({ error: 'Use /x, /bluesky, /dev-null or /linkedin.' }));
+    return response.end(JSON.stringify({ error: 'Use /x, /bluesky, /dev-null, /linkedin or /threads.' }));
   }
   request.url = '/' + rest.join('/');
   try {
@@ -48,5 +49,5 @@ const server = createServer(async (request, response) => {
   }
 });
 server.listen(port, '127.0.0.1', () => {
-  process.stdout.write(`Fake sites on http://127.0.0.1:${port} (/x${browser ? ' website' : ''}, /bluesky, /dev-null, /linkedin)\n`);
+  process.stdout.write(`Fake sites on http://127.0.0.1:${server.address().port} (/x${browser ? ' website' : ''}, /bluesky, /dev-null, /linkedin, /threads)\n`);
 });

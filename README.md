@@ -1,6 +1,6 @@
 # Postslop
 
-Write once and publish text and images to **X, Bluesky, dev-null.sh and LinkedIn** using the sessions you are already signed in with. No developer API keys. Postslop runs on your Mac, on [CrabPHP](https://github.com/crabphp/framework).
+Write once and publish text and images to **X, Bluesky, dev-null.sh, LinkedIn and Threads** using the sessions you are already signed in with. No developer API keys. Postslop runs on your Mac, on [CrabPHP](https://github.com/crabphp/framework). [Threads support is experimental](docs/threads.md); its integration is tested against local fakes, not a live account.
 
 ```
  Raycast ──────┐
@@ -56,7 +56,7 @@ For scripts and agents, every command takes `--json` and prints exactly one JSON
 
 ### Scheduling
 
-`postslop serve` runs CrabPHP's schedule and queue beside the web server when `SERVER_SCHEDULE` and `SERVER_QUEUE` are on in `.env`; no OS cron or launchd job is involved. Every minute the schedule pushes a `PublishDuePosts` job onto the queue (the `jobs` table), which hands each due post's destinations to the sites' own queues. Each site, `x`, `bluesky`, `dev-null` and `linkedin`, has its own queue and worker (`config/queue.php`) and its own lock (`storage/publishing-x.lock` and so on), so one post goes to every site at the same time while a site never gets two posts at once. A repeated or retried job is harmless because the core never publishes a delivery twice. `php cua schedule:list` shows the task and `php cua queue:failed` shows jobs that gave up. `postslop run-due` still publishes due posts by hand.
+`postslop serve` runs CrabPHP's schedule and queue beside the web server when `SERVER_SCHEDULE` and `SERVER_QUEUE` are on in `.env`; no OS cron or launchd job is involved. Every minute the schedule pushes a `PublishDuePosts` job onto the queue (the `jobs` table), which hands each due post's destinations to the sites' own queues. Each site, `x`, `bluesky`, `dev-null`, `linkedin` and `threads`, has its own queue and worker (`config/queue.php`) and its own lock (`storage/publishing-x.lock` and so on), so one post goes to every site at the same time while a site never gets two posts at once. A repeated or retried job is harmless because the core never publishes a delivery twice. `php cua schedule:list` shows the task and `php cua queue:failed` shows jobs that gave up. `postslop run-due` still publishes due posts by hand.
 
 ## Web client
 
@@ -84,7 +84,7 @@ The **Postslop** extension composes inside Raycast. It runs the local CLI, so it
 
 ## Browser sessions
 
-`postslop setup` reads Chrome's last used profile, asks which account is signed in on each site, and saves only those three sites' sessions in one file, `server/storage/sessions.json`. Check the accounts in the browser first. Postslop refuses a session that belongs to another account than the handle you give. Chrome encrypts its cookies, so macOS asks once to let Postslop use "Chrome Safe Storage": choose Allow. `--browser=firefox` imports from Firefox's default profile instead, `--profile=DIR` picks another profile, and `--check-only` reads without saving. Name sites, such as `postslop setup x`, to import only those.
+`postslop setup` reads Chrome's last used profile, asks which account is signed in on each site, and saves only the selected sites' sessions in one file, `server/storage/sessions.json`. Check the accounts in the browser first. Postslop refuses a session that belongs to another account than the handle you give. Chrome encrypts its cookies, so macOS asks once to let Postslop use "Chrome Safe Storage": choose Allow. `--browser=firefox` imports from Firefox's default profile instead, `--profile=DIR` picks another profile, and `--check-only` reads without saving. Name sites, such as `postslop setup x`, to import only those.
 
 Postslop holds one account per site. `postslop accounts disable SITE` turns one off without forgetting it: the composer stops offering it and nothing is published to it. `enable` turns it back on and `remove` deletes its session; its posts stay in the history. The web client's Accounts page does the same.
 
@@ -95,6 +95,8 @@ Under the hood, `scripts/import_chrome_sessions.py` and `scripts/import_firefox_
 X runs in the app-owned headless browser. Postslop hands it the X cookies from `sessions.json` with each request; it loads them into its own profile in `server/storage/browser/x/` and checks the signed-in account before posting. dev-null.sh uses cookies and CSRF headers through Crab's HTTP client. LinkedIn does too, calling the same web API (Voyager) linkedin.com's own pages use: `li_at` signs in, and the `JSESSIONID` value is the CSRF token. Its handle is the name in your profile address, `linkedin.com/in/NAME`. LinkedIn's web API is undocumented and LinkedIn discourages automation, so treat it as the most fragile destination. Bluesky keeps its session tokens from localStorage and refreshes them when needed. Sessions expire and sites change: an unavailable account shows a reason, so import it again when needed.
 
 X can accept a session for account checks while rejecting a post. Error 226 is an explicit automation rejection. Error 344 is reported as an action limit, and is not by itself proof that a daily quota ran out. Postslop keeps the draft and the failed result, and never retries automatically. The former HTTP-only X adapter remains available with `POSTSLOP_X_TRANSPORT=http` for diagnostics; it is never an automatic fallback.
+
+For Threads, sign in at <https://www.threads.com/> and run `postslop setup threads --threads=YOUR_HANDLE`. Threads uses its own imported cookies through Crab's HTTP client, checks the signed-in identity, and supports text up to 500 characters and Postslop's usual maximum of four images. It appears in the web and Raycast composers and supports drafts and scheduling through the same core. See [Threads setup and limitations](docs/threads.md).
 
 
 ## Never twice
@@ -112,6 +114,7 @@ cd server
 composer format:check && composer lint
 php tests/core.php && php tests/api.php
 php tests/x-rejections.php && php tests/browser-publisher.php
+php tests/threads.php
 (cd browser-worker && npm test)
 (cd ../clients/web && npm run build)
 (cd ../clients/raycast && npm run typecheck && npm run lint && npm run build)

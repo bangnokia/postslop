@@ -15,7 +15,7 @@ use App\PrivateFiles;
 // @mago-expect lint:cyclomatic-complexity,too-many-methods
 final readonly class SessionStore
 {
-    private const array PLATFORMS = ['x', 'bluesky', 'dev-null', 'linkedin'];
+    private const array PLATFORMS = ['x', 'bluesky', 'dev-null', 'linkedin', 'threads'];
 
     public function __construct(
         private string $path,
