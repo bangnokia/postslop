@@ -1,6 +1,6 @@
 # Threads
 
-Threads is an experimental destination in the CLI, HTTP API, web composer and Raycast extension. The integration is tested against a local fake site. Live sign-in and publication have not been verified.
+Threads is an experimental destination in the CLI, HTTP API, web composer and Raycast extension. Automated checks use a local fake site. Read-only sign-in has been verified with an imported Chrome session; live publication has not been verified.
 
 ## Setup
 
@@ -30,7 +30,7 @@ Threads' web API is undocumented and its persisted query IDs and provider flags 
 
 ## Protocol reference
 
-The adapter uses the web protocol described by the public [threads-bot source at commit 93f1c38](https://github.com/alpersamur3/threads-bot/tree/93f1c38187ab70c5ec6a60aefed4c3e860aeecac/src): homepage LSD/DTSG tokens, viewer/profile GraphQL queries, `rupload_igphoto`, and the text, image and carousel configuration endpoints. This is a protocol reference, not a runtime dependency. Postslop does not use that library's automatic retries or credential-login behavior.
+The adapter uses the web protocol described by the public [threads-bot source at commit 93f1c38](https://github.com/alpersamur3/threads-bot/tree/93f1c38187ab70c5ec6a60aefed4c3e860aeecac/src): homepage LSD/DTSG tokens, viewer/profile GraphQL queries, `rupload_igphoto`, and the text, image and carousel configuration endpoints. The observed account responses use `data.viewer.user` and `data.user`; the `xdt_*` root-field headers are backend names, not response keys. This is a protocol reference, not a runtime dependency. Postslop does not use that library's automatic retries or credential-login behavior.
 
 Image descriptions use `custom_accessibility_caption`, with confirmation required in the returned media. That field's live Threads behavior remains unverified. The fake site's responses exercise Postslop's handling; they do not establish live compatibility.
 

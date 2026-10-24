@@ -36,10 +36,12 @@ module.exports = async (req, res) => {
     if (scenario === 'query-changed') return send(res, 200, { errors: [{ message: 'Unknown persisted query' }] });
     if (form.fb_dtsg !== 'fixture-dtsg' || form.lsd !== 'fixture-lsd' || req.headers['x-fb-lsd'] !== 'fixture-lsd') return send(res, 403, { status: 'fail' });
     if (form.fb_api_req_friendly_name === 'BarcelonaFeedTimelineViewerQuery') {
-      return send(res, 200, { data: { xdt_text_app_viewer: { user: { pk: scenario === 'wrong-viewer' ? '67890' : '12345' } } } });
+      if (scenario === 'missing-viewer') return send(res, 200, { data: { viewer: null } });
+      return send(res, 200, { data: { viewer: { user: { id: scenario === 'wrong-viewer' ? '67890' : '12345', text_post_app_is_private: false, hide_like_and_view_counts: false } } } });
     }
     if (form.fb_api_req_friendly_name === 'BarcelonaUserDialogQuery' && JSON.parse(form.variables).userID === '12345') {
-      return send(res, 200, { data: { xdt_text_app_user: { pk: '12345', username: scenario === 'wrong-handle' ? 'someone_else' : 'tester' } } });
+      if (scenario === 'missing-profile') return send(res, 200, { data: { user: null } });
+      return send(res, 200, { data: { user: { pk: scenario === 'wrong-profile-id' ? '67890' : '12345', username: scenario === 'wrong-handle' ? 'someone_else' : 'tester' } } });
     }
     return send(res, 400, { errors: [{ message: 'Unmodeled account query' }] });
   }

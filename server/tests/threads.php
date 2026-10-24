@@ -77,7 +77,7 @@ try {
     threads_check($publisher->publish(PostRequest::uuid(), str_repeat('é', 500), [])['status'] === 'published', '500-character post failed');
     threads_check($publisher->publish(PostRequest::uuid(), str_repeat('é', 501), [])['status'] === 'failed' && $stats()['submissions'] === 1, 'Overlong text was sent');
 
-    foreach (['wrong-viewer', 'wrong-handle', 'expired', 'query-changed', 'upload-failed'] as $scenario) {
+    foreach (['wrong-viewer', 'wrong-profile-id', 'wrong-handle', 'missing-viewer', 'missing-profile', 'expired', 'query-changed', 'upload-failed'] as $scenario) {
         $reset($scenario);
         $request = PostRequest::fromApi(['text' => 'Do not submit', 'platforms' => ['threads'], 'images' => [$attachment]]);
         threads_check($core->create($request)['status'] === 'failed', $scenario . ' was not a safe failure');

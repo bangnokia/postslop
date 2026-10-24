@@ -1,6 +1,6 @@
 # Postslop
 
-Write once and publish text and images to **X, Bluesky, dev-null.sh, LinkedIn and Threads** using the sessions you are already signed in with. No developer API keys. Postslop runs on your Mac, on [CrabPHP](https://github.com/crabphp/framework). [Threads support is experimental](docs/threads.md); its integration is tested against local fakes, not a live account.
+Write once and publish text and images to **X, Bluesky, dev-null.sh, LinkedIn and Threads** using the sessions you are already signed in with. No developer API keys. Postslop runs on your Mac, on [CrabPHP](https://github.com/crabphp/framework). [Threads support is experimental](docs/threads.md); automated checks use local fakes and live publishing remains unverified.
 
 ```
  Raycast ──────┐

@@ -268,7 +268,8 @@ final readonly class ThreadsPublisher implements Publisher
                 array_values(self::VIEWER_FLAGS),
             ),
         );
-        $user = $viewer['xdt_text_app_viewer']['user'] ?? $viewer['xdt_text_app_viewer'] ?? [];
+        // The root-field headers name backend fields; the response aliases are viewer and user.
+        $user = $viewer['viewer']['user'] ?? [];
         if ((string) ($user['pk'] ?? $user['id'] ?? '') !== $session['userId']) {
             throw new RemoteSessionFailure(
                 'Threads could not verify the signed-in account. Import the correct session again.',
@@ -277,7 +278,7 @@ final readonly class ThreadsPublisher implements Publisher
         $profile = $this->query($session, 'BarcelonaUserDialogQuery', self::USER_QUERY, [
             'userID' => $session['userId'],
         ]);
-        $user = $profile['xdt_text_app_user'] ?? [];
+        $user = $profile['user'] ?? [];
         $handle = $user['username'] ?? null;
         if (
             (string) ($user['pk'] ?? $user['id'] ?? '') !== $session['userId']
