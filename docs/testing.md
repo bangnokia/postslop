@@ -15,6 +15,10 @@ The sites answer under `/x`, `/bluesky`, `/dev-null`, `/linkedin` and `/threads`
 
 `php tests/threads.php` starts its own fake server and temporary database. It covers text, single images, carousels, descriptions, account mismatches, expired sessions, failed uploads, rejected and uncertain writes, duplicate protection, the Threads queue, HTTP account management, and draft-by-default CLI behavior. It never reads personal sessions.
 
+`php tests/accounts.php` checks individual account refresh without contacting other sites, cached check times, authorization, and dev-null.sh's current handle field and publication identity checks. Both scripts exercise credential-free account failure details.
+
+From the repository root, `composer test:client` tests the standalone PHP browser reader and remote account client. It builds synthetic Firefox/Chrome databases and localStorage, covers WAL snapshots, encryption host binding, active Bluesky identity, malformed inputs and credential-free failures, and imports with an empty executable search path to prove Python and Node are not client requirements. The API stand-in runs only on loopback. Set `POSTSLOP_CLIENT_BINARY` to an installed Composer binary to repeat the remote client tests against a packaged installation.
+
 ## The HTTP API
 
 In another terminal, start an isolated server:

@@ -12,6 +12,7 @@ Route::get('/', Home::class);
 Route::get('/assets/{file}', WebAsset::class);
 
 Route::get('/api/v1/accounts', [PostsApi::class, 'accounts']);
+Route::post('/api/v1/accounts/{platform}/check', [PostsApi::class, 'checkAccount']);
 Route::put('/api/v1/accounts/{platform}', [PostsApi::class, 'importAccount']);
 Route::patch('/api/v1/accounts/{platform}', [PostsApi::class, 'changeAccount']);
 Route::delete('/api/v1/accounts/{platform}', [PostsApi::class, 'removeAccount']);

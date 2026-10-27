@@ -70,7 +70,7 @@ final readonly class ThreadsPublisher implements Publisher
             $session = $this->connect();
             return [...$status, 'available' => true, 'handle' => $session['handle']];
         } catch (RemoteSessionFailure $error) {
-            return [...$status, 'reason' => $error->getMessage()];
+            return [...$status, 'reason' => $error->getMessage(), 'detail' => $error->detail];
         } catch (ClientExceptionInterface) {
             return [...$status, 'reason' => 'Threads could not be reached. Try checking the connection again.'];
         } catch (\RuntimeException) {
@@ -235,13 +235,42 @@ final readonly class ThreadsPublisher implements Publisher
         $client = $this->http->timeout(35)->retry(0);
         // The application HTTP client has redirects disabled, so no cookie can follow a login redirect elsewhere.
         $home = $client->get($url . '/', headers: $headers);
+        $code = $home->getStatusCode();
+        if ($this->sessionCleared($home)) {
+            throw new RemoteSessionFailure(
+                'Threads rejected the saved session on this server. Sign in to Threads in your browser, then import it again.',
+                'Sign-in check: GET / returned HTTP '
+                . $code
+                . ' and instructed the browser to expire its session cookie. The saved cookie expiry date does not mean the session is still accepted.',
+            );
+        }
+        if ($code >= 300 && $code < 400) {
+            throw new RemoteSessionFailure(
+                'Threads redirected the sign-in check before confirming the account. Check your browser sign-in, then import it again.',
+                'Sign-in check: GET / returned HTTP '
+                . $code
+                . '. Postslop did not forward your session through the redirect; the account identity remains unverified.',
+            );
+        }
+        if (!$home->ok()) {
+            throw new RemoteSessionFailure(
+                'Threads did not accept the account check. Try checking again later.',
+                'Sign-in check: GET / returned HTTP '
+                . $code
+                . '. This response alone does not establish that the session has expired.',
+            );
+        }
         $html = (string) $home->getBody();
         if (
-            !$home->ok()
-            || preg_match('/"LSD",\[\],\{"token":"([^"\\\\]+)"/', $html, $lsd) !== 1
+            preg_match('/"LSD",\[\],\{"token":"([^"\\\\]+)"/', $html, $lsd) !== 1
             || preg_match('/"DTSGInitData",\[\],\{"token":"([^"\\\\]+)"/', $html, $dtsg) !== 1
         ) {
-            throw new RemoteSessionFailure('Threads did not confirm this sign-in. Import the session again.');
+            throw new RemoteSessionFailure(
+                'Threads returned an unrecognized sign-in page. Check your browser sign-in or check for a Postslop update.',
+                'Sign-in check: HTTP '
+                . $code
+                . ', but the page is missing the tokens needed for account verification. The page may be a login, challenge, or changed website response.',
+            );
         }
         $session = [
             'url' => $url,
@@ -432,6 +461,32 @@ final readonly class ThreadsPublisher implements Publisher
             throw new RemoteSessionFailure('The Threads server URL is invalid.');
         }
         return $url;
+    }
+
+    private function sessionCleared(Response $response): bool
+    {
+        foreach ($response->getHeader('Set-Cookie') as $cookie) {
+            if (preg_match('/^sessionid=([^;]*)/i', $cookie, $value) !== 1) {
+                continue;
+            }
+            if ($value[1] === '') {
+                return true;
+            }
+            // Max-Age takes precedence over Expires when both are present.
+            if (preg_match('/;\s*max-age=(-?[0-9]+)(?:;|$)/i', $cookie, $age) === 1) {
+                if ((int) $age[1] <= 0) {
+                    return true;
+                }
+                continue;
+            }
+            if (preg_match('/;\s*expires=([^;]+)/i', $cookie, $expiry) === 1) {
+                $timestamp = strtotime($expiry[1]);
+                if ($timestamp !== false && $timestamp <= time()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static function uploadId(): string

@@ -29,9 +29,9 @@ final readonly class DevNullPublisher implements Publisher
         }
         try {
             $session = $this->connect();
-            return [...$status, 'available' => true, 'handle' => '@' . $session['user']['username']];
+            return [...$status, 'available' => true, 'handle' => '@' . $session['handle']];
         } catch (RemoteSessionFailure $error) {
-            return [...$status, 'reason' => $error->getMessage()];
+            return [...$status, 'reason' => $error->getMessage(), 'detail' => $error->detail];
         } catch (ClientExceptionInterface) {
             return [...$status, 'reason' => 'dev-null.sh could not be reached. Try checking the connection again.'];
         } catch (\RuntimeException) {
@@ -116,7 +116,7 @@ final readonly class DevNullPublisher implements Publisher
                     'dev-null.sh did not return a post ID. Check your profile before posting again.',
                 );
             }
-            $path = '/@' . rawurlencode($session['user']['username']) . '/commits/' . $committed['id'];
+            $path = '/@' . rawurlencode($session['handle']) . '/commits/' . $committed['id'];
             $verified = $session['client']->get($session['url'] . $path, headers: $this->headers(
                 $session['url'],
                 $session['version'],
@@ -126,7 +126,7 @@ final readonly class DevNullPublisher implements Publisher
                 !$verified->ok()
                 || !is_array($commit)
                 || ($commit['id'] ?? null) !== $committed['id']
-                || ($commit['user']['username'] ?? null) !== $session['user']['username']
+                || ($commit['user']['handle'] ?? $commit['user']['username'] ?? null) !== $session['handle']
                 || ($commit['body'] ?? null) !== ($committed['body'] ?? null)
                 || !is_array($commit['images'] ?? null)
                 || count($commit['images']) !== count($images)
@@ -169,7 +169,7 @@ final readonly class DevNullPublisher implements Publisher
         );
     }
 
-    /** @return array{url: string, client: Client, jar: DevNullCookieJar, user: array<string, mixed>, version: ?string} */
+    /** @return array{url: string, client: Client, jar: DevNullCookieJar, handle: string, version: ?string} */
     private function connect(): array
     {
         $state = $this->sessions->read('dev-null');
@@ -183,28 +183,36 @@ final readonly class DevNullPublisher implements Publisher
         $this->sessions->write('dev-null', $jar->state());
         if (!$response->ok()) {
             throw new RemoteSessionFailure(
-                'dev-null.sh could not verify this sign-in. Import your browser session again.',
+                'dev-null.sh did not accept the profile check. Check the connection and your browser sign-in.',
+                'Profile check: GET /settings/profile returned HTTP '
+                . $response->getStatusCode()
+                . '. The account identity was not verified.',
             );
         }
         $page = $this->page($response);
         $user = $page['props']['auth']['user'] ?? null;
+        // The site renamed username to handle; use the same identity for checks and post verification.
+        $handle = $user['handle'] ?? $user['username'] ?? null;
         $expected = ltrim($this->sessions->expectedHandle('dev-null') ?? '', '@');
-        if (
-            !is_array($user)
-            || !is_string($user['username'] ?? null)
-            || ($user['id'] ?? null) === null
-            || $expected === ''
-            || strtolower($user['username']) !== strtolower($expected)
-        ) {
+        if (!is_array($user) || !is_string($handle) || $handle === '' || ($user['id'] ?? null) === null) {
+            throw new RemoteSessionFailure(
+                'dev-null.sh returned an unrecognized account profile. Check for a Postslop update or sign in again.',
+                'Profile check: HTTP '
+                . $response->getStatusCode()
+                . ', but the signed-in user ID or handle is missing. This does not establish an account mismatch.',
+            );
+        }
+        if ($expected === '' || strcasecmp($handle, $expected) !== 0) {
             throw new RemoteSessionFailure(
                 'The dev-null.sh session does not match the intended account. Import it again.',
+                'Profile check: the signed-in handle differs from the handle saved in Postslop.',
             );
         }
         return [
             'url' => $url,
             'client' => $client,
             'jar' => $jar,
-            'user' => $user,
+            'handle' => $handle,
             'version' => $page['version'] ?? null,
         ];
     }

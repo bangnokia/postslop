@@ -45,7 +45,7 @@ Times are UTC. A URL identifies an existing post on that site; it is never an in
 
 ## Accounts — `GET /api/v1/accounts`
 
-Postslop holds one account per site. Sign-in checks are cached for 30 seconds; `?refresh=1` checks again. Bluesky may refresh an expired access token with its saved refresh token. X is checked through the private background browser, which opens no window.
+Postslop holds one account per site. Sign-in checks are cached per account for 30 seconds; `?refresh=1` checks them all again. Bluesky may refresh an expired access token with its saved refresh token. X is checked through the private background browser, which opens no window.
 
 ```json
 {
@@ -62,6 +62,10 @@ Postslop holds one account per site. Sign-in checks are cached for 30 seconds; `
 Handles have no leading `@`. A platform can be unavailable even when session data exists; show `reason` and let the user pick other destinations. An optional `detail` holds technical information for diagnosing it, such as the background browser's own error, with secrets removed. `textLimit` is for counters; each publisher enforces its site's exact rule.
 
 `connected` says a session is saved. `enabled` is false for an account turned off in Postslop: it keeps its session, is not checked, and a post still addressed to it fails for that site with nothing sent. Offer only accounts that are connected and enabled.
+
+`checkedAt` is the UTC time that account's check completed; it is unchanged when answering from cache, and null for missing or disabled accounts. `importedAt` and `source` describe the saved browser session, not proof that it is still accepted.
+
+`POST /api/v1/accounts/{site}/check` bypasses only that site's cache and returns a single account object. It never checks other accounts, even when their caches are empty or expired. It uses the same access token as the other API endpoints. Disabled and missing accounts are reported without contacting their sites.
 
 Each of these answers with the accounts, as `GET /api/v1/accounts?refresh=1` does:
 

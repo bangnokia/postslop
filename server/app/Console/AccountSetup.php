@@ -11,19 +11,14 @@ use Crab\Contracts\Console\Input;
 use Crab\Contracts\Console\Output;
 use Crab\Contracts\HttpClient\Client;
 use Crab\Contracts\HttpClient\Response;
+use Postslop\Client\BrowserSessions;
 use Psr\Http\Client\ClientExceptionInterface;
 
 // Each step of the import is a guard with its own message.
 // @mago-expect lint:cyclomatic-complexity,kan-defect,halstead
 final readonly class AccountSetup extends CliCommand
 {
-    private const array SITES = [
-        'x' => 'X',
-        'bluesky' => 'Bluesky',
-        'dev-null' => 'dev-null.sh',
-        'linkedin' => 'LinkedIn',
-        'threads' => 'Threads',
-    ];
+    private const array SITES = BrowserSessions::SITES;
 
     public function __construct(
         private Publishing $publishing,
@@ -65,11 +60,7 @@ final readonly class AccountSetup extends CliCommand
         if (!in_array($browser, ['chrome', 'firefox'], true)) {
             throw Failure::invalid('Choose --browser=chrome or --browser=firefox.');
         }
-        // Chrome's importer finds its last used profile itself.
-        $profile = self::value($input, 'profile') ?? ($browser === 'firefox' ? self::defaultProfile() : null);
-        if ($browser === 'firefox' && !is_file($profile . '/cookies.sqlite')) {
-            throw Failure::invalid('No Firefox profile with cookies at ' . $profile . '. Pass --profile=DIR.');
-        }
+        $profile = self::value($input, 'profile');
         $output->line('Importing from ' . ($browser === 'chrome' ? 'Chrome' : 'Firefox') . '.');
         $sites = $input->arguments() === [] ? array_keys(self::SITES) : array_values(array_unique($input->arguments()));
         foreach ($sites as $site) {
@@ -96,28 +87,10 @@ final readonly class AccountSetup extends CliCommand
         if ($handles === []) {
             throw Failure::invalid('Give the handle of at least one site.');
         }
-        $command = [
-            'python3',
-            dirname(__DIR__, 2) . '/scripts/import_' . $browser . '_sessions.py',
-            ...($profile !== null ? ['--profile', $profile] : []),
-        ];
-        foreach ($handles as $site => $handle) {
-            array_push($command, '--' . $site . '-handle', $handle);
-        }
-        $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-        if (!is_resource($process)) {
-            throw Failure::invalid('Could not run python3. Install Python 3 and try again.');
-        }
-        $stdout = (string) stream_get_contents($pipes[1]);
-        $stderr = trim((string) stream_get_contents($pipes[2]));
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        if (proc_close($process) !== 0) {
-            throw Failure::invalid($stderr !== '' ? $stderr : 'The session import failed.');
-        }
-        $report = json_decode($stdout, true);
-        if (!is_array($report['accounts'] ?? null)) {
-            throw Failure::invalid('The session import returned nothing usable.');
+        try {
+            $report = BrowserSessions::read($browser, $profile, $handles);
+        } catch (\RuntimeException $error) {
+            throw Failure::invalid($error->getMessage());
         }
         $output->line('Profile: ' . ($report['profile'] ?? $profile));
         foreach ($handles as $site => $handle) {
@@ -248,40 +221,5 @@ final readonly class AccountSetup extends CliCommand
         }
         fwrite(STDOUT, $question);
         return (string) fgets(STDIN);
-    }
-
-    private static function defaultProfile(): string
-    {
-        $home = (string) getenv('HOME');
-        foreach ([
-            $home . '/Library/Application Support/Firefox',
-            $home . '/.config/mozilla/firefox',
-            $home . '/.mozilla/firefox',
-        ] as $base) {
-            $ini = is_file($base . '/profiles.ini')
-                ? parse_ini_file($base . '/profiles.ini', true, INI_SCANNER_RAW)
-                : false;
-            if (!is_array($ini)) {
-                continue;
-            }
-            // The profile Firefox opens is the install's default, else the one marked default.
-            $path = null;
-            foreach ($ini as $section => $values) {
-                if (!str_starts_with($section, 'Install')) {
-                    continue;
-                }
-                $path ??= $values['Default'] ?? null;
-            }
-            foreach ($ini as $values) {
-                if (($values['Default'] ?? '') !== '1') {
-                    continue;
-                }
-                $path ??= $values['Path'] ?? null;
-            }
-            if ($path !== null) {
-                return str_starts_with($path, '/') ? $path : $base . '/' . $path;
-            }
-        }
-        throw Failure::invalid('Firefox was not found. Pass the profile folder with --profile=DIR.');
     }
 }

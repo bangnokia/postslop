@@ -1,0 +1,43 @@
+name: Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  client:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        php: ['8.2', '8.4']
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, pdo_sqlite, openssl, iconv
+          coverage: none
+          tools: composer:v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: composer validate --strict
+      - run: composer test:client
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, gd, fileinfo, mbstring, dom, pdo_sqlite, pcntl, posix, openssl, iconv
+          coverage: none
+          tools: composer:v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: composer deps --no-interaction
+      - run: npx --prefix server/browser-worker playwright install --with-deps firefox
+      - run: composer --working-dir=server validate --strict
+      - run: composer check

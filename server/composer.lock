@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "28ec4aa2161281d5a44d2599dff53318",
+    "content-hash": "7764009241c182d7d93642d3937798d8",
     "packages": [
         {
             "name": "crabphp/framework",
-            "version": "dev-main",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/crabphp/framework.git",
-                "reference": "a919c3079d7ff1677615965e4967aa0cafd154a7"
+                "reference": "4cd9dd5a72c9ea65f22b31d64ff4f81ebdf31b97"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/crabphp/framework/zipball/a919c3079d7ff1677615965e4967aa0cafd154a7",
-                "reference": "a919c3079d7ff1677615965e4967aa0cafd154a7",
+                "url": "https://api.github.com/repos/crabphp/framework/zipball/4cd9dd5a72c9ea65f22b31d64ff4f81ebdf31b97",
+                "reference": "4cd9dd5a72c9ea65f22b31d64ff4f81ebdf31b97",
                 "shasum": ""
             },
             "require": {
@@ -46,7 +46,6 @@
                 "ext-pcntl": "Supervised parallel workers and Unix signals",
                 "ext-posix": "Supervised worker termination and lifecycle control"
             },
-            "default-branch": true,
             "bin": [
                 "bin/crab"
             ],
@@ -104,10 +103,10 @@
             ],
             "description": "A minimal PHP 8.4 web framework on the Crab networking engine",
             "support": {
-                "source": "https://github.com/crabphp/framework/tree/main",
+                "source": "https://github.com/crabphp/framework/tree/v0.1.0",
                 "issues": "https://github.com/crabphp/framework/issues"
             },
-            "time": "2026-10-24T10:22:40+00:00"
+            "time": "2026-10-24T11:10:10+00:00"
         },
         {
             "name": "psr/clock",
@@ -773,14 +772,15 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "dev",
-    "stability-flags": {
-        "crabphp/framework": 20
-    },
+    "minimum-stability": "stable",
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.4"
+        "php": "^8.4",
+        "ext-openssl": "*",
+        "ext-pdo_sqlite": "*",
+        "ext-iconv": "*"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"

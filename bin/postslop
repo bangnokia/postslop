@@ -1,0 +1,14 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+// Self-contained so cpx can execute the installed package's binary directly, from any working directory.
+require dirname(__DIR__) . '/clients/cli/src/Snapshot.php';
+require dirname(__DIR__) . '/clients/cli/src/BrowserStorage.php';
+require dirname(__DIR__) . '/clients/cli/src/BrowserCookies.php';
+require dirname(__DIR__) . '/clients/cli/src/BrowserSessions.php';
+require dirname(__DIR__) . '/clients/cli/src/Remote.php';
+require dirname(__DIR__) . '/clients/cli/src/Application.php';
+
+exit((new Postslop\Client\Application())->run(array_slice($argv, 1)));

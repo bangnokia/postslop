@@ -1,10 +1,10 @@
 # Postslop
 
-Write once and publish text and images to **X, Bluesky, dev-null.sh, LinkedIn and Threads** using the sessions you are already signed in with. No developer API keys. Postslop runs on your Mac, on [CrabPHP](https://github.com/crabphp/framework). [Threads support is experimental](docs/threads.md); automated checks use local fakes and live publishing remains unverified.
+Write once and publish text and images to **X, Bluesky, dev-null.sh, LinkedIn and Threads** using the sessions you are already signed in with. No developer API keys. Postslop runs locally or on your server, on [CrabPHP](https://github.com/crabphp/framework). [Threads support is experimental](docs/threads.md); automated checks use local fakes and live publishing remains unverified.
 
 ```
  Raycast ──────┐
- AI / scripts ─┴─▶ bin/postslop (CLI) ─┐
+ AI / scripts ─┴─▶ server/bin/postslop ─┐
                                        ▼
                                Core (server/app/Core) ── SQLite, sessions, images
                                        ▲
@@ -19,11 +19,28 @@ One core holds every rule: drafts, scheduling, history, and never posting the sa
 | `server/` | The core, the CLI, the HTTP API, the X browser worker, private storage |
 | `clients/web/` | The web client: Vite, React, TypeScript |
 | `clients/raycast/` | The Raycast extension, which calls the CLI, or the API of a Postslop on a server |
+| `clients/cli/` | The lightweight remote account client distributed as `bangnokia/postslop` through Composer/cpx |
 | `docs/` | [HTTP API](docs/api.md) and [testing against fake sites](docs/testing.md) |
 
-## Install
+## Connect your browser to an existing server
 
-Requires PHP 8.4+ with `fileinfo` and `gd`, Composer, Node 22+ and Python 3. Composer installs CrabPHP from GitHub at the exact commit in `composer.lock`.
+With [cpx](https://github.com/laravel/cpx) already installed, you do not need a repository checkout, Node, or a local Postslop server. The client requires PHP 8.2+ with curl, OpenSSL, PDO SQLite and iconv (included in typical Homebrew PHP installations). No Python or Node is needed on the client. Chrome imports use macOS Keychain; Firefox is supported on macOS and Linux.
+
+```sh
+# Set POSTSLOP_REMOTE_TOKEN to your server's access token in this terminal first.
+cpx bangnokia/postslop setup threads --to=https://YOUR_SERVER
+cpx bangnokia/postslop accounts check threads --to=https://YOUR_SERVER
+```
+
+The first command asks for the handle signed in in your browser. Add `--threads=YOUR_HANDLE` to provide it explicitly, or `--browser=firefox` to use Firefox. Use `setup` without a site to choose several accounts. `POSTSLOP_SERVER_URL` can replace `--to`; `--check-only` reads the browser without sending anything.
+
+cpx downloads and caches the client, checks for updates periodically, and supports `cpx update bangnokia/postslop` to update immediately. It does not require cloning or pulling this repository. The client keeps no session or token files in its package cache. Browser sessions are sent only to the server you name, where the shared core checks the intended account.
+
+The Composer package exposes `setup` and `accounts` (including `check`, `enable`, `disable`, and `remove`). Publish through the web client or Raycast. The full local CLI and backend remain in `server/`; the root `bin/postslop` is the standalone remote client. See [client usage](clients/cli/README.md) and [release instructions](docs/releasing.md). Packagist must have indexed the release before the public `cpx` command can install it.
+
+## Install the server or full local CLI
+
+Requires PHP 8.4+ with `fileinfo` and `gd`, Composer and Node 22+ (for the web build and X browser worker). Composer installs CrabPHP's stable `0.1.x` releases through the GitHub VCS repository, pinned by `server/composer.lock`; CrabPHP is not on Packagist.
 
 ```sh
 composer deps                 # locked server, web and browser-worker dependencies
@@ -52,7 +69,7 @@ composer dev                  # restart on file changes; Ctrl+C stops it
 
 These use `server/.env`. The schedule and queues start when `SERVER_SCHEDULE` and `SERVER_QUEUE` are enabled. `dev` watches files and restarts automatically; `start` never watches, including in the foreground, and refuses `--watch` and `--no-watch`. Use `composer reload` to load production changes. `stop`, `reload` and `restart` manage the background server; stop a foreground server with Ctrl+C. `server:status` lists foreground and background servers, queue workers and schedulers, with per-worker requests, jobs and runs. It exits with 0 when any server is running, or 1 when none is. Composer's built-in `status` command is unrelated, hence `server:status`.
 
-With the current framework pin, repeat any startup `--address` and `--workers` overrides on `composer reload -- …` and `composer restart -- …`. Automatic preservation of those overrides is pending upstream.
+`reload` and `restart` preserve the `--address` and `--workers` overrides supplied at startup. Pass new values after `--` when you want to change them. Settings without explicit overrides continue to follow `server/.env` and configuration.
 
 Run `composer cua -- describe` to inspect the application, or `composer cua -- describe app` to check settings after editing configuration. Invalid settings, including unknown keys in framework sections, prevent startup, reload and queue workers. The SQLite database defaults to `server/storage/database.sqlite`; `DB_DATABASE` changes its path, and an existing `DB_DSN` still overrides the connection. The default connection's migrations live in `server/database/migrations`.
 
@@ -87,6 +104,7 @@ Remote account imports use `POSTSLOP_REMOTE_TOKEN` or an explicit `--token=TOKEN
 
 ```sh
 postslop accounts                          # which accounts are ready
+postslop accounts check threads            # recheck just Threads, without contacting other sites
 postslop accounts disable bluesky          # stop using one (enable turns it back on, remove forgets it)
 postslop post "Hello"                      # save a draft
 postslop post "Hello" --now                # publish now
@@ -134,9 +152,11 @@ The **Postslop** extension composes inside Raycast. It runs the local CLI, so it
 
 Postslop holds one account per site. `postslop accounts disable SITE` turns one off without forgetting it: the composer stops offering it and nothing is published to it. `enable` turns it back on and `remove` deletes its session; its posts stay in the history. The web client's Accounts page does the same.
 
+Each account card has its own **Check again** button, plus the session's import source and time, last check time, and details when verification fails. **Check all** checks every enabled account. A single check is also available through `POST /api/v1/accounts/{platform}/check`; it returns that account and never checks another site.
+
 When Postslop runs on another machine, import on the computer with the browser and send the sessions there: `bin/postslop setup x --to=https://postslop.example.com --token=TOKEN`, where the token is that server's `POSTSLOP_TOKEN` (or set `POSTSLOP_REMOTE_TOKEN`). Nothing is saved locally. Sessions sign in as you, so `--to` needs https, except for localhost, a private network or Tailscale.
 
-Under the hood, `scripts/import_chrome_sessions.py` and `scripts/import_firefox_sessions.py` read the browser's files without closing it or changing anything, and make no network requests. They skip partitioned and container cookies and X's multiple-account cookie, and keep only the active Bluesky account. Chrome's Bluesky session is read from its localStorage LevelDB files.
+Under the hood, the shared PHP readers in `clients/cli/src/` read the browser's files without closing it or changing anything, and make no network requests. They skip partitioned and container cookies and X's multiple-account cookie, and keep only the active Bluesky account. Chrome's Bluesky session is read from its localStorage LevelDB files.
 
 X runs in the app-owned headless browser. Postslop hands it the X cookies from `sessions.json` with each request; it loads them into its own profile in `server/storage/browser/x/` and checks the signed-in account before posting. dev-null.sh uses cookies and CSRF headers through Crab's HTTP client. LinkedIn does too, calling the same web API (Voyager) linkedin.com's own pages use: `li_at` signs in, and the `JSESSIONID` value is the CSRF token. Its handle is the name in your profile address, `linkedin.com/in/NAME`. LinkedIn's web API is undocumented and LinkedIn discourages automation, so treat it as the most fragile destination. Bluesky keeps its session tokens from localStorage and refreshes them when needed. Sessions expire and sites change: an unavailable account shows a reason, so import it again when needed.
 

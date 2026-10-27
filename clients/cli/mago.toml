@@ -1,0 +1,12 @@
+version = "1"
+php-version = "8.2.0"
+
+[source]
+workspace = "."
+paths = ["clients/cli/src", "bin/postslop"]
+
+[formatter]
+print-width = 120
+
+[linter.rules]
+literal-named-argument = { enabled = false }

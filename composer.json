@@ -1,7 +1,7 @@
 {
-    "name": "postslop/workspace",
-    "description": "Root commands for the Postslop server and clients",
-    "type": "project",
+    "name": "bangnokia/postslop",
+    "description": "Remote account client for Postslop: import browser sessions and manage social accounts",
+    "type": "library",
     "config": {
         "process-timeout": 0,
         "lock": false
@@ -36,12 +36,22 @@
             "npm --prefix clients/raycast run typecheck",
             "npm --prefix clients/raycast run lint"
         ],
-        "format": "@composer --working-dir=server format",
-        "format:check": "@composer --working-dir=server format:check",
-        "lint": "@composer --working-dir=server lint",
+        "format": [
+            "@composer --working-dir=server format",
+            "@php server/vendor/bin/mago --config clients/cli/mago.toml fmt"
+        ],
+        "format:check": [
+            "@composer --working-dir=server format:check",
+            "@php server/vendor/bin/mago --config clients/cli/mago.toml fmt --check"
+        ],
+        "lint": [
+            "@composer --working-dir=server lint",
+            "@php server/vendor/bin/mago --config clients/cli/mago.toml lint"
+        ],
         "test:server": [
             "@php server/tests/core.php",
             "@php server/tests/api.php",
+            "@php server/tests/accounts.php",
             "@php server/tests/x-rejections.php",
             "@php server/tests/threads.php"
         ],
@@ -50,6 +60,7 @@
             "npm --prefix server/browser-worker test"
         ],
         "test": [
+            "@test:client",
             "@test:server",
             "@test:browser"
         ],
@@ -58,6 +69,10 @@
             "@lint",
             "@test",
             "@build"
+        ],
+        "test:client": [
+            "@php server/tests/browser-import.php",
+            "@php server/tests/remote-client.php"
         ]
     },
     "scripts-descriptions": {
@@ -86,6 +101,43 @@
         "test:server": "Run core, API and HTTP publishing checks against fakes",
         "test:browser": "Run the browser bridge and worker checks against fakes",
         "test": "Run all server and browser publishing checks",
-        "check": "Check PHP formatting, lint, tests and the web build"
+        "check": "Check PHP formatting, lint, tests and the web build",
+        "test:client": "Test the standalone account client with synthetic browser sessions and a local API"
+    },
+    "license": "MIT",
+    "keywords": [
+        "postslop",
+        "social",
+        "cli",
+        "threads",
+        "raycast"
+    ],
+    "homepage": "https://github.com/bangnokia/postslop",
+    "support": {
+        "issues": "https://github.com/bangnokia/postslop/issues",
+        "source": "https://github.com/bangnokia/postslop"
+    },
+    "require": {
+        "php": "^8.2",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "ext-openssl": "*",
+        "ext-pdo_sqlite": "*",
+        "ext-iconv": "*"
+    },
+    "bin": [
+        "bin/postslop"
+    ],
+    "archive": {
+        "exclude": [
+            "/server/storage",
+            "/server/vendor",
+            "/server/public",
+            "/vendor",
+            "**/node_modules",
+            "**/.env",
+            "**/.env.*",
+            "**/auth.json"
+        ]
     }
 }

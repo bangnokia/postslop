@@ -27,6 +27,17 @@ module.exports = async (req, res) => {
   }
   if (cookies.foreign || cookies.expired || cookies.scoped) return send(res, 400, { error: 'Unrelated cookies forwarded' });
   if (path === '/' && req.method === 'GET') {
+    if (scenario === 'session-cleared') return send(res, 302, '', {
+      Location: 'https://example.invalid/?private=fixture-threads-session',
+      'Set-Cookie': 'sessionid=deleted; Max-Age=-1; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Path=/',
+    });
+    if (scenario === 'session-expired-date') return send(res, 302, '', {
+      Location: 'https://example.invalid/',
+      'Set-Cookie': 'sessionid=deleted; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Path=/',
+    });
+    if (scenario === 'check-blocked') return send(res, 403, 'fixture-threads-session');
+    if (scenario === 'check-rate-limit') return send(res, 429, 'fixture-threads-session');
+    if (scenario === 'page-changed') return send(res, 200, '<html>fixture-threads-session</html>');
     return send(res, 200, '<script>["LSD",[],{"token":"fixture-lsd"}],["DTSGInitData",[],{"token":"fixture-dtsg"}],["CurrentUserInitialData",[],{"USER_ID":"12345"}]</script>', { 'Content-Type': 'text/html' });
   }
   if (req.headers['x-csrftoken'] !== 'fixture-threads-csrf' || req.headers['x-ig-app-id'] !== '238260118697367'

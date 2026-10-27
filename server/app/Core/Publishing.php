@@ -52,60 +52,72 @@ final readonly class Publishing
      */
     public function refreshAccounts(): array
     {
-        $this->cache->delete(self::ACCOUNTS);
+        foreach (array_keys($this->publishers) as $platform) {
+            $this->cache->delete(self::ACCOUNTS . '.' . $platform);
+        }
         return $this->accounts();
+    }
+
+    /** Checks only this site's session, even when no other account has been cached. */
+    public function refreshAccount(string $platform): array
+    {
+        self::platform($platform);
+        $this->cache->delete(self::ACCOUNTS . '.' . $platform);
+        return $this->account($platform);
     }
 
     public function accounts(): array
     {
+        return [
+            'platforms' => array_map($this->account(...), array_keys($this->publishers)),
+            'limits' => ['maxImages' => PostRequest::MAX_IMAGES, 'maxImageBytes' => PostRequest::MAX_IMAGE_BYTES],
+            'publishingEnabled' => true,
+        ];
+    }
+
+    private function account(string $id): array
+    {
         // A command line run is its own process, so the check is shared through the cache.
-        return $this->cache->remember(self::ACCOUNTS, 30, function (): array {
-            $platforms = [];
-            foreach ($this->publishers as $id => $publisher) {
-                $account = $this->sessions->summary($id);
-                $extra = [
-                    'enabled' => $account['enabled'],
-                    'connected' => $account['connected'],
-                    'importedAt' => $account['importedAt'],
-                    'source' => $account['source'],
-                    'maxImages' => Platforms::maxImages([$id]),
-                    'textLimit' => Platforms::TEXT_LIMITS[$id] ?? null,
-                ];
-                // An account without a session, or turned off, is not checked: it is not used as it is.
-                if (!$account['connected'] || !$account['enabled']) {
-                    $platforms[] = [
-                        'id' => $id,
-                        'label' => Platforms::LABELS[$id] ?? $id,
-                        'available' => false,
-                        'handle' => $account['handle'],
-                        'reason' => $account['connected']
-                            ? 'Turned off in Postslop.'
-                            : 'Not connected. Run: postslop setup ' . $id,
-                        ...$extra,
-                    ];
-                    continue;
-                }
-                try {
-                    $status = $publisher->status();
-                } catch (\Throwable) {
-                    $status = [
-                        'id' => $id,
-                        'label' => $id,
-                        'available' => false,
-                        'reason' => 'Could not verify this session. Reimport it and try again.',
-                    ];
-                }
-                // A session that cannot sign in still shows the handle it was imported for.
-                $status['handle'] = is_string($status['handle'] ?? null)
-                    ? ltrim($status['handle'], '@')
-                    : $account['handle'];
-                $platforms[] = [...$status, ...$extra];
-            }
-            return [
-                'platforms' => $platforms,
-                'limits' => ['maxImages' => PostRequest::MAX_IMAGES, 'maxImageBytes' => PostRequest::MAX_IMAGE_BYTES],
-                'publishingEnabled' => true,
+        return $this->cache->remember(self::ACCOUNTS . '.' . $id, 30, function () use ($id): array {
+            $publisher = $this->publishers[$id] ?? throw Failure::notFound('This account is not supported.');
+            $account = $this->sessions->summary($id);
+            $extra = [
+                'enabled' => $account['enabled'],
+                'connected' => $account['connected'],
+                'importedAt' => $account['importedAt'],
+                'source' => $account['source'],
+                'checkedAt' => null,
+                'maxImages' => Platforms::maxImages([$id]),
+                'textLimit' => Platforms::TEXT_LIMITS[$id] ?? null,
             ];
+            // An account without a session, or turned off, is not checked: it is not used as it is.
+            if (!$account['connected'] || !$account['enabled']) {
+                return [
+                    'id' => $id,
+                    'label' => Platforms::LABELS[$id] ?? $id,
+                    'available' => false,
+                    'handle' => $account['handle'],
+                    'reason' => $account['connected']
+                        ? 'Turned off in Postslop.'
+                        : 'Not connected. Run: postslop setup ' . $id,
+                    ...$extra,
+                ];
+            }
+            try {
+                $status = $publisher->status();
+            } catch (\Throwable) {
+                $status = [
+                    'id' => $id,
+                    'label' => $id,
+                    'available' => false,
+                    'reason' => 'Could not verify this session. Reimport it and try again.',
+                ];
+            }
+            // A session that cannot sign in still shows the handle it was imported for.
+            $status['handle'] = is_string($status['handle'] ?? null)
+                ? ltrim($status['handle'], '@')
+                : $account['handle'];
+            return [...$status, ...$extra, 'checkedAt' => self::now()];
         });
     }
 
@@ -448,7 +460,7 @@ final readonly class Publishing
         } finally {
             self::unlock($lock);
         }
-        $this->cache->delete(self::ACCOUNTS);
+        $this->cache->delete(self::ACCOUNTS . '.' . $platform);
         $this->settle($this->row($id) ?? throw Failure::notFound());
     }
 

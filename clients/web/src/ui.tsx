@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { api, cleanUrl, PLATFORM_NAMES, type Accounts, type Platform, type PostStatus, type Result } from "./api";
+import { api, cleanUrl, PLATFORM_NAMES, type Account, type Accounts, type Platform, type PostStatus, type Result } from "./api";
 import { Icon } from "./components/icons";
 
 export function useRoute(): string[] {
@@ -50,6 +50,7 @@ export interface AccountState {
   refresh: () => void;
   // Shows the accounts an account change answered with.
   replace: (accounts: Accounts) => void;
+  replaceAccount: (account: Account) => void;
 }
 
 // Set up and turned on: the accounts the composer offers.
@@ -71,7 +72,11 @@ export function useAccounts(): AccountState {
       .finally(() => setChecking(false));
   };
   useEffect(() => load(false), []);
-  return { accounts, error, checking, refresh: () => load(true), replace: setAccounts };
+  const replaceAccount = (account: Account) => setAccounts((current) => current ? {
+    ...current,
+    platforms: current.platforms.map((item) => item.id === account.id ? account : item),
+  } : current);
+  return { accounts, error, checking, refresh: () => load(true), replace: setAccounts, replaceAccount };
 }
 
 export type Theme = "system" | "light" | "dark";

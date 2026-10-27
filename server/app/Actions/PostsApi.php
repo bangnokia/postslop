@@ -63,6 +63,11 @@ final readonly class PostsApi
         return $this->publishing->removeAccount($platform);
     }
 
+    public function checkAccount(string $platform): array
+    {
+        return $this->publishing->refreshAccount($platform);
+    }
+
     public function index(ServerRequestInterface $request): array
     {
         $query = $request->getQueryParams();

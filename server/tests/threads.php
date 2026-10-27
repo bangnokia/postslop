@@ -49,6 +49,18 @@ try {
     $stats = static fn(): array => $http->get($url . '/__stats')->json();
     $reset();
     threads_check($publisher->status()['available'], 'Threads account did not verify');
+    foreach (['session-cleared', 'session-expired-date', 'expired', 'check-blocked', 'check-rate-limit', 'page-changed'] as $scenario) {
+        $reset($scenario);
+        $status = $publisher->status();
+        threads_check(!$status['available'] && is_string($status['detail'] ?? null), 'Missing account diagnostics for ' . $scenario);
+        threads_check(!str_contains(json_encode($status), 'fixture-threads-session'), 'Account diagnostics exposed private response data');
+        if (str_starts_with($scenario, 'session-')) {
+            threads_check(str_contains($status['reason'], 'rejected the saved session'), 'Session rejection was not explained');
+        } else {
+            threads_check(!str_contains($status['reason'], 'rejected the saved session'), 'An unverified response was reported as a rejected session');
+        }
+    }
+    $reset();
     $accounts = $core->accounts()['platforms'];
     $account = array_values(array_filter($accounts, static fn(array $item): bool => $item['id'] === 'threads'))[0];
     threads_check($account['available'] && $account['textLimit'] === 500 && $account['maxImages'] === 4, 'Threads capabilities were not exposed');
@@ -132,6 +144,8 @@ try {
         threads_check(proc_close($process) === 0, 'CLI failed: ' . $errors . $output);
         return json_decode($output, true, flags: JSON_THROW_ON_ERROR);
     };
+    $checked = $command(['accounts', 'check', 'threads']);
+    threads_check(count($checked['platforms']) === 1 && $checked['platforms'][0]['available'], 'CLI did not check just Threads');
     $draft = $command(['post', 'CLI draft', '--to=threads']);
     threads_check($draft['status'] === 'draft' && $stats()['submissions'] === 1, 'CLI published without --now');
     $sent = $command(['post', 'CLI synchronous publish', '--to=threads', '--now']);

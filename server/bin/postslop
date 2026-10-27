@@ -31,6 +31,7 @@ if ($name === null || in_array($name, ['help', '--help', '-h'], true) && !isset(
           postslop setup [SITE]          Import your signed-in sessions from Chrome (or --browser=firefox);
                                          add --to=URL to send them to Postslop on another machine
           postslop accounts              Show which accounts are ready
+          postslop accounts check SITE   Recheck only one account
           postslop accounts disable SITE Turn an account off (enable turns it back on, remove forgets it)
           postslop post "Text"           Save a draft (add --now to publish, --at=TIME to schedule)
           postslop posts                 List posts, newest first

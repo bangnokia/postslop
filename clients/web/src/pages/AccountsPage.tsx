@@ -20,13 +20,31 @@ function stateOf(account?: Account): State {
 function setupCommand(platform?: Platform) {
   const site = platform ? ` ${platform}` : "";
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
-  if (local) return `bin/postslop setup${site}`;
-  return `bin/postslop setup${site} --to=${window.location.origin}${storedToken() ? " --token=YOUR_TOKEN" : ""}`;
+  if (local) return `composer accounts:import --${site}`;
+  return `cpx bangnokia/postslop setup${site} --to=${window.location.origin}${storedToken() ? " --token=YOUR_TOKEN" : ""}`;
 }
 
 export function AccountsPage({ accounts }: { accounts: AccountState }) {
   const [busy, setBusy] = useState<Platform>();
+  const [checking, setChecking] = useState<Set<Platform>>(new Set());
   const [error, setError] = useState<string>();
+  const changing = accounts.checking || busy !== undefined || checking.size > 0;
+
+  async function check(id: Platform) {
+    setChecking((current) => new Set(current).add(id));
+    setError(undefined);
+    try {
+      accounts.replaceAccount(await api.checkAccount(id));
+    } catch (reason) {
+      setError(`${PLATFORM_NAMES[id]}: ${(reason as Error).message}`);
+    } finally {
+      setChecking((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
 
   async function change(id: Platform, action: () => Promise<Accounts>) {
     setBusy(id);
@@ -43,8 +61,8 @@ export function AccountsPage({ accounts }: { accounts: AccountState }) {
   return (
     <>
       <PageHeader title="Accounts">
-        <button type="button" className="btn btn-secondary" disabled={accounts.checking} onClick={accounts.refresh}>
-          <Icon name="refresh" /> {accounts.checking ? "Checking…" : "Check again"}
+        <button type="button" className="btn btn-secondary" disabled={changing} onClick={accounts.refresh}>
+          <Icon name="refresh" /> {accounts.checking ? "Checking…" : "Check all"}
         </button>
       </PageHeader>
       <div className="page-body page-body-narrow">
@@ -63,7 +81,7 @@ export function AccountsPage({ accounts }: { accounts: AccountState }) {
                   </div>
                   {account?.connected ? (
                     <label className="switch" title={account.enabled ? "Turn off" : "Turn on"}>
-                      <input type="checkbox" role="switch" checked={account.enabled} disabled={busy === id} onChange={(event) => change(id, () => api.setAccount(id, event.target.checked))} />
+                      <input type="checkbox" role="switch" checked={account.enabled} disabled={changing} onChange={(event) => change(id, () => api.setAccount(id, event.target.checked))} />
                       <span className="visually-hidden">Use {PLATFORM_NAMES[id]}</span>
                     </label>
                   ) : null}
@@ -84,8 +102,21 @@ export function AccountsPage({ accounts }: { accounts: AccountState }) {
                 )}
                 {account?.detail && state === "attention" && (
                   <details className="account-detail">
-                    <summary>Technical details</summary>
+                    <summary>Check details</summary>
                     <code>{account.detail}</code>
+                  </details>
+                )}
+                {account?.connected && (
+                  <dl className="account-session">
+                    {account.importedAt && <div><dt>Session imported</dt><dd>{when(account.importedAt)}{account.source ? ` from ${account.source}` : ""}</dd></div>}
+                    {account.checkedAt && <div><dt>Last checked</dt><dd>{when(account.checkedAt)}</dd></div>}
+                  </dl>
+                )}
+                {state === "attention" && (
+                  <details className="account-reason">
+                    <summary>Refresh browser session</summary>
+                    <p>Sign in as {account?.handle ? `@${account.handle.replace(/^@/, "")}` : "your intended account"} in Chrome or Firefox, then run on your computer:</p>
+                    <pre><code>{setupCommand(id)}</code></pre>
                   </details>
                 )}
                 {account?.connected && (
@@ -98,20 +129,24 @@ export function AccountsPage({ accounts }: { accounts: AccountState }) {
                       <dt>Images</dt>
                       <dd>{account.maxImages}</dd>
                     </div>
-                    {account.importedAt && (
-                      <div>
-                        <dt>Imported</dt>
-                        <dd title={`${when(account.importedAt)}${account.source ? ` from ${account.source}` : ""}`}>{new Date(account.importedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</dd>
-                      </div>
-                    )}
                   </dl>
                 )}
                 {account?.connected && (
                   <div className="account-actions">
                     <button
                       type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={accounts.checking || busy !== undefined || checking.has(id) || !account.enabled}
+                      aria-label={`Check ${PLATFORM_NAMES[id]} account`}
+                      title={account.enabled ? "Check only this account" : "Turn on this account to check it"}
+                      onClick={() => check(id)}
+                    >
+                      <Icon name="refresh" size={14} /> {checking.has(id) ? "Checking…" : "Check again"}
+                    </button>
+                    <button
+                      type="button"
                       className="btn btn-ghost btn-sm btn-danger"
-                      disabled={busy === id}
+                      disabled={changing}
                       onClick={() => {
                         if (window.confirm(`Remove ${PLATFORM_NAMES[id]}${account.handle ? ` @${account.handle}` : ""}? Its saved session is deleted; its posts stay in the history.`)) change(id, () => api.removeAccount(id));
                       }}
@@ -127,14 +162,16 @@ export function AccountsPage({ accounts }: { accounts: AccountState }) {
         <section className="card setup-card">
           <h2>Connect or refresh accounts</h2>
           <p>
-            Postslop uses the sessions you are already signed in with in Chrome or Firefox. It needs no API keys. Postslop holds one account per site. Check which account is signed in on each site, then run in the <code>server</code> folder on your computer:
+            Postslop uses the sessions you are already signed in with in Chrome or Firefox. It needs no API keys. Postslop holds one account per site. Check which account is signed in on each site, then run on your computer:
           </p>
           <pre>
             <code>{setupCommand()}</code>
           </pre>
           <p className="muted">
             Name a site, such as <code>setup x</code>, to import only that one. It reads Chrome (add <code>--browser=firefox</code> for Firefox), asks for each handle, and refuses a session that belongs to another account.
-            {!["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname) && <> With <code>--to</code> the sessions go straight to this server instead of being saved on your computer.</>}
+            {!["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
+              ? <> The client needs cpx and PHP with curl, OpenSSL, PDO SQLite and iconv. No Python or Node is needed. With <code>--to</code> the sessions go straight to this server instead of being saved on your computer.</>
+              : <> Run the Composer command from the repository root.</>}
           </p>
         </section>
       </div>

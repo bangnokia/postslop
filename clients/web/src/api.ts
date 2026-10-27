@@ -34,6 +34,7 @@ export interface Account {
   reason?: string;
   // What went wrong underneath the reason, such as the background browser's own error.
   detail?: string;
+  checkedAt?: string | null;
   importedAt?: string | null;
   source?: string | null;
   maxImages: number;
@@ -152,6 +153,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   accounts: (refresh = false) => call<Accounts>("GET", `/accounts${refresh ? "?refresh=1" : ""}`),
+  checkAccount: (id: Platform) => call<Account>("POST", `/accounts/${id}/check`, {}),
   setAccount: (id: Platform, enabled: boolean) => call<Accounts>("PATCH", `/accounts/${id}`, { enabled }),
   removeAccount: (id: Platform) => call<Accounts>("DELETE", `/accounts/${id}`),
   posts: (status: PostStatus[] = [], before?: string, limit = 20) => {

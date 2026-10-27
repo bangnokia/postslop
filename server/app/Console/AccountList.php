@@ -18,12 +18,13 @@ final readonly class AccountList extends CliCommand
     public function description(): string
     {
         return <<<'TEXT'
-            Show the accounts, or turn one on or off, or remove it
+            Show the accounts, check one, turn one on or off, or remove it
             Usage: postslop accounts [--refresh] [--json]
-                   postslop accounts enable|disable|remove SITE [--json]
+                   postslop accounts check|enable|disable|remove SITE [--json]
             SITE is x, bluesky, dev-null, linkedin or threads. A turned-off account keeps its session but is not offered
             or published to. Removing one deletes its session; its posts stay in the history.
             Add or refresh an account with: postslop setup SITE
+            Check only one site's saved session with: postslop accounts check SITE
             Options:
               --refresh  Check every session again instead of using the last 30 seconds' result
             TEXT;
@@ -40,9 +41,10 @@ final readonly class AccountList extends CliCommand
         }
         $accounts = match ($action) {
             null => $input->flag('refresh') ? $this->publishing->refreshAccounts() : $this->publishing->accounts(),
+            'check' => ['platforms' => [$this->publishing->refreshAccount((string) $site)]],
             'enable', 'disable' => $this->publishing->setEnabled((string) $site, $action === 'enable'),
             'remove' => $this->publishing->removeAccount((string) $site),
-            default => throw Failure::invalid('Use: postslop accounts [enable|disable|remove SITE]'),
+            default => throw Failure::invalid('Use: postslop accounts [check|enable|disable|remove SITE]'),
         };
         if ($input->flag('json')) {
             $output->line(self::json($accounts));
