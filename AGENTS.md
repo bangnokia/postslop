@@ -4,6 +4,7 @@
 - Store posts, deliveries and images in SQLite through the core; never publish around it.
 - While in development, keep one migration file per table and edit it in place instead of adding migrations; `migrate:rollback` then `migrate` rebuilds the database.
 - A CLI post is a draft unless `--now` or a scheduled time is given explicitly, so AI agents never publish by default.
+- Expose remote agent tools through Streamable HTTP MCP at `/api/v1/mcp`, protected by the existing server token. Delegate to the core, create drafts by default, and keep scheduling/publishing explicit. Require stable request IDs and timezone-qualified schedule times; never expose sessions or credentials through MCP.
 - Build the web client with Vite, React and TypeScript in `clients/web`; it builds into `server/public`, which is not committed.
 - Test against the plain Node fake sites in `server/tests/fakes`, never real accounts; do not reintroduce Postman.
 - Keep server tests in `server/tests/`, including browser worker tests; `composer test` runs them from the repository root.

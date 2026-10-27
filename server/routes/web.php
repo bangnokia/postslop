@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Home;
+use App\Actions\McpApi;
 use App\Actions\PostsApi;
 use App\Actions\WebAsset;
 use Crab\Route;
@@ -10,6 +11,10 @@ use Crab\Route;
 // The web client, built by clients/web into public/.
 Route::get('/', Home::class);
 Route::get('/assets/{file}', WebAsset::class);
+
+Route::post('/api/v1/mcp', McpApi::class);
+Route::get('/api/v1/mcp', McpApi::class);
+Route::delete('/api/v1/mcp', McpApi::class);
 
 Route::get('/api/v1/accounts', [PostsApi::class, 'accounts']);
 Route::post('/api/v1/accounts/{platform}/check', [PostsApi::class, 'checkAccount']);

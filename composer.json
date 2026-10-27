@@ -51,6 +51,7 @@
         "test:server": [
             "@php server/tests/core.php",
             "@php server/tests/api.php",
+            "@php server/tests/mcp.php",
             "@php server/tests/accounts.php",
             "@php server/tests/x-rejections.php",
             "@php server/tests/threads.php"

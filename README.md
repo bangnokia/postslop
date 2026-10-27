@@ -9,10 +9,11 @@ Write once and publish text and images to **X, Bluesky, dev-null.sh, LinkedIn an
                                Core (server/app/Core) ── SQLite, sessions, images
                                        ▲
  web client ──▶ /api/v1 (HTTP) ────────┤
+ AI agents ───▶ /api/v1/mcp (HTTP) ───┤
  schedule ──▶ queue (postslop start) ──┘
 ```
 
-One core holds every rule: drafts, scheduling, history, and never posting the same thing twice. It has two front doors. The **command line** runs the core directly, so Raycast and AI agents need no server running. The **HTTP API** serves the web client, and Raycast when Postslop runs on another machine.
+One core holds every rule: drafts, scheduling, history, and never posting the same thing twice. It has two front doors. The **command line** runs the core directly, so Raycast and AI agents need no server running. The **HTTP API** serves the web client, Raycast when Postslop runs on another machine, and remote agents through [MCP](docs/mcp.md).
 
 | Folder | What |
 | --- | --- |
@@ -20,7 +21,11 @@ One core holds every rule: drafts, scheduling, history, and never posting the sa
 | `clients/web/` | The web client: Vite, React, TypeScript |
 | `clients/raycast/` | The Raycast extension, which calls the CLI, or the API of a Postslop on a server |
 | `clients/cli/` | The lightweight remote account client distributed as `bangnokia/postslop` through Composer/cpx |
-| `docs/` | [HTTP API](docs/api.md) and [testing against fake sites](docs/testing.md) |
+| `docs/` | [HTTP API](docs/api.md), [MCP](docs/mcp.md), and [testing against fake sites](docs/testing.md) |
+
+## Connect an AI agent
+
+Add `https://YOUR_SERVER/api/v1/mcp` to an MCP client using **Streamable HTTP** and the server's access token as a bearer header. Agents can check accounts, create/edit drafts, schedule posts, publish when asked, and check results. Draft creation never publishes; scheduling and publishing are separate tools. MCP runs inside the existing server, with no extra installation. See [connection details and tool usage](docs/mcp.md).
 
 ## Connect your browser to an existing server
 

@@ -21,6 +21,8 @@ From the repository root, `composer test:client` tests the standalone PHP browse
 
 ## The HTTP API
 
+From the repository root, `php server/tests/mcp.php` exercises the MCP endpoint through the real middleware and core using a fake publisher and isolated storage. It checks version negotiation, JSON-RPC errors, token and origin checks, tool input validation, draft defaults, image edits, scheduling with timezones, per-site queues, duplicate protection and uncertain deliveries. `composer test:server` includes it.
+
 In another terminal, start an isolated server:
 
 ```sh
