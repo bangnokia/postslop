@@ -6,11 +6,28 @@ require __DIR__ . '/support.php';
 
 use App\Core\Publishing;
 use App\Social\Publisher;
+use App\Social\VideoAttachment;
 use Crab\Queue\Consumer;
 use Crab\Testing\Api;
 
 // An assertion evaluates a boolean condition rather than selecting a behavior.
 // @mago-expect lint:no-boolean-flag-parameter
+/**
+ * A dummy MP4 with only the boxes the core reads: ftyp, mvhd, and a video track's tkhd and hdlr.
+ */
+function api_mp4(int $width, int $height, int $milliseconds): string
+{
+    $box = static fn(string $type, string $payload): string => pack('N', 8 + strlen($payload)) . $type . $payload;
+    $matrix = pack('N9', 0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000);
+    $mvhd = $box('mvhd', "\0\0\0\0" . pack('N4', 0, 0, 1000, $milliseconds) . str_repeat("\0", 80));
+    $tkhd = $box('tkhd', "\0\0\0\x03" . pack('N5', 0, 0, 1, 0, $milliseconds) . str_repeat("\0", 16) . $matrix
+        . pack('N2', $width << 16, $height << 16));
+    $hdlr = $box('hdlr', str_repeat("\0", 8) . 'vide' . str_repeat("\0", 12) . "VideoHandler\0");
+    return $box('ftyp', 'isom' . pack('N', 512) . 'isomiso2avc1mp41')
+        . $box('moov', $mvhd . $box('trak', $tkhd . $box('mdia', $hdlr)))
+        . $box('mdat', str_repeat("\x07", 256));
+}
+
 function api_check(bool $condition, string $message): void
 {
     if (!$condition) {
@@ -31,7 +48,7 @@ $publisher = new class implements Publisher {
         return ['id' => 'bluesky', 'label' => 'Bluesky', 'available' => true, 'handle' => 'fixture'];
     }
 
-    public function publish(string $requestId, string $text, array $images): array
+    public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
     {
         $this->calls++;
         return ['platform' => 'bluesky', 'status' => 'published', 'url' => 'https://bsky.app/profile/fixture/post/1'];
@@ -67,6 +84,31 @@ try {
     $id = $draft['id'];
     $media = $api->get('/api/v1/media/' . $draft['images'][0]['id'])->assertStatus(200);
     api_check($media->body() === $png && $media->header('Content-Type') === 'image/png', 'The image was not served back');
+
+    // A video travels as base64 like an image, comes back apart from the images, and is served with its type.
+    $clip = api_mp4(1280, 720, 4000);
+    $videoDraft = $api->post('/api/v1/posts', [
+        'text' => 'a video from the web',
+        'platforms' => ['bluesky'],
+        'mode' => 'draft',
+        'video' => ['data' => base64_encode($clip), 'mimeType' => 'video/mp4', 'alt' => 'A dummy clip'],
+    ])->assertStatus(200)->assertJson('video.width', 1280)->assertJson('video.height', 720)->json();
+    api_check($videoDraft['images'] === [] && $videoDraft['video']['alt'] === 'A dummy clip', 'The video draft was not presented');
+    $served = $api->get('/api/v1/media/' . $videoDraft['video']['id'])->assertStatus(200);
+    api_check($served->body() === $clip && $served->header('Content-Type') === 'video/mp4', 'The video was not served back');
+    $api->post('/api/v1/posts', [
+        'text' => 'x',
+        'platforms' => ['bluesky', 'dev-null'],
+        'mode' => 'draft',
+        'video' => ['data' => base64_encode($clip)],
+    ])->assertStatus(422);
+    $api->delete('/api/v1/posts/' . $videoDraft['id'])->assertStatus(204);
+    $accountList = $api->get('/api/v1/accounts')->assertStatus(200)->json();
+    api_check(
+        array_column($accountList['platforms'], 'maxVideoSeconds', 'id')['bluesky'] === 180
+            && $accountList['limits']['maxVideoBytes'] === 20_971_520,
+        'Accounts did not say which sites take videos',
+    );
 
     $api->put('/api/v1/posts/' . $id, ['text' => 'edited', 'platforms' => ['bluesky'], 'mode' => 'draft'])
         ->assertStatus(200)
@@ -153,7 +195,7 @@ try {
     // Without a token the API is open.
     putenv('POSTSLOP_TOKEN=');
     new Api(test_app($directory . '/open'))->get('/api/v1/posts')->assertStatus(200);
-    echo "API checks passed: token checks, an open API without a token, drafts, images, edits, scheduling, publishing, history, deletion, accounts, and error codes.\n";
+    echo "API checks passed: token checks, an open API without a token, drafts, images, videos, edits, scheduling, publishing, history, deletion, accounts, and error codes.\n";
 } finally {
     test_remove($directory);
 }

@@ -116,6 +116,7 @@ Base URL and token come from the user (`POSTSLOP_TOKEN` in the server's `.env`).
 | Schedule | the same with `"scheduledAt": "2026-10-22T02:00:00Z"` |
 | Publish now | the same with `"mode": "now"` |
 | Images | `"images": [{"mimeType": "image/png", "data": "<base64>", "alt": "…"}]` |
+| Video (instead of images; X, Bluesky, LinkedIn) | `"video": {"mimeType": "video/mp4", "data": "<base64>", "alt": "…"}`, or `{"path", "alt"}` on the command line |
 | Read | `GET /api/v1/posts/{id}`, `GET /api/v1/posts?status=draft` |
 | Publish, retry, schedule, delete | `POST …/{id}/publish`, `POST …/{id}/retry`, `POST …/{id}/schedule`, `DELETE …/{id}` |
 

@@ -52,6 +52,8 @@ export interface Draft {
   text: string;
   platforms: Platform[];
   images: Attachment[];
+  // One video, never together with images.
+  video?: Attachment;
   submitted: boolean;
   result?: PostResult;
   uncertainty?: string;
@@ -62,6 +64,27 @@ export interface Draft {
     queuedAt: number;
     claimed?: boolean;
   };
+}
+
+function validAttachment(item: Attachment) {
+  return (
+    typeof item?.path === "string" &&
+    typeof item.filename === "string" &&
+    typeof item.mimeType === "string" &&
+    typeof item.alt === "string"
+  );
+}
+
+// Everything attached to a draft: its images, or its one video.
+export function attachmentsOf(draft: Draft): Attachment[] {
+  return draft.video ? [...draft.images, draft.video] : draft.images;
+}
+
+// A draft worth keeping in Saved Posts: anything written, attached or sent.
+export function hasContent(draft: Draft) {
+  return Boolean(
+    draft.text || draft.images.length || draft.video || draft.submitted,
+  );
 }
 
 export function newDraft(destinations: Platform[] = [...platforms]): Draft {
@@ -245,7 +268,7 @@ export class DraftStore {
 
   openNewPost(legacy?: string) {
     const previous = this.load(legacy);
-    if (previous.text || previous.images.length || previous.submitted) {
+    if (hasContent(previous)) {
       if (previous.backgroundTask) this.saveTask(previous);
       this.archive(previous);
     }
@@ -289,13 +312,8 @@ export class DraftStore {
         !Array.isArray(draft.platforms) ||
         !draft.platforms.every((item) => platforms.includes(item)) ||
         !Array.isArray(draft.images) ||
-        !draft.images.every(
-          (item) =>
-            typeof item.path === "string" &&
-            typeof item.filename === "string" &&
-            typeof item.mimeType === "string" &&
-            typeof item.alt === "string",
-        ) ||
+        !draft.images.every(validAttachment) ||
+        (draft.video !== undefined && !validAttachment(draft.video)) ||
         !Array.isArray(draft.previouslyPublished)
       )
         throw new Error("Invalid draft");
@@ -332,19 +350,22 @@ export class DraftStore {
       );
   }
 
-  removeImages(images: Attachment[]) {
+  removeAttachments(attachments: Attachment[]) {
     const retained = new Set(
       this.savedPosts().flatMap((draft) =>
-        draft.images.map((image) => image.path),
+        attachmentsOf(draft).map((item) => item.path),
       ),
     );
-    for (const image of images) {
-      if (retained.has(image.path)) continue;
+    const owned = [
+      resolve(this.directory, "images"),
+      resolve(this.directory, "videos"),
+    ];
+    for (const attachment of attachments) {
+      if (retained.has(attachment.path)) continue;
       // Only delete copies owned by this extension, never a user's selected source file.
-      if (dirname(resolve(image.path)) !== resolve(this.directory, "images"))
-        continue;
+      if (!owned.includes(dirname(resolve(attachment.path)))) continue;
       try {
-        unlinkSync(image.path);
+        unlinkSync(attachment.path);
       } catch {
         /* An unused private copy can be cleaned up later. */
       }

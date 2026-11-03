@@ -6,9 +6,11 @@ require __DIR__ . '/support.php';
 
 use App\Core\Failure;
 use App\Core\PostRequest;
+use App\Core\VideoFile;
 use App\Core\Publishing;
 use App\Social\SessionStore;
 use App\Social\ThreadsPublisher;
+use App\Social\VideoAttachment;
 use Crab\Contracts\HttpClient\Client;
 use Crab\Queue\Consumer;
 use Crab\Testing\Api;
@@ -18,6 +20,21 @@ function threads_check(bool $condition, string $message): void
     if (!$condition) {
         throw new RuntimeException($message);
     }
+}
+
+// A dummy video: the boxes the core reads (ftyp, moov/mvhd, trak/tkhd, mdia/hdlr "vide") and a little media data.
+function threads_mp4(int $width = 640, int $height = 360, int $milliseconds = 3000): string
+{
+    $box = static fn(string $type, string $payload): string => pack('N', 8 + strlen($payload)) . $type . $payload;
+    $identity = pack('N9', 0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000);
+    $mvhd = $box('mvhd', "\0\0\0\0" . pack('NNNN', 0, 0, 1000, $milliseconds) . pack('Nn', 0x10000, 0x100)
+        . str_repeat("\0", 10) . $identity . str_repeat("\0", 24) . pack('N', 2));
+    $tkhd = $box('tkhd', "\0\0\0\x03" . pack('NNNNN', 0, 0, 1, 0, $milliseconds) . str_repeat("\0", 8)
+        . pack('nnnn', 0, 0, 0, 0) . $identity . pack('NN', $width << 16, $height << 16));
+    $hdlr = $box('hdlr', "\0\0\0\0" . pack('N', 0) . 'vide' . str_repeat("\0", 12) . "VideoHandler\0");
+    return $box('ftyp', 'isom' . pack('N', 512) . 'isomiso2avc1mp41')
+        . $box('moov', $mvhd . $box('trak', $tkhd . $box('mdia', $hdlr)))
+        . $box('mdat', str_repeat("\0", 64));
 }
 
 $directory = sys_get_temp_dir() . '/postslop-threads-' . bin2hex(random_bytes(6));
@@ -89,6 +106,21 @@ try {
     threads_check($publisher->publish(PostRequest::uuid(), str_repeat('é', 500), [])['status'] === 'published', '500-character post failed');
     threads_check($publisher->publish(PostRequest::uuid(), str_repeat('é', 501), [])['status'] === 'failed' && $stats()['submissions'] === 1, 'Overlong text was sent');
 
+    // Threads takes no videos from Postslop: a dummy video is refused before any request. The core either refuses it
+    // up front or records a safe failure, depending on Platforms::VIDEO_SECONDS; either way nothing reaches Threads.
+    $dummy = threads_mp4();
+    threads_check(VideoFile::inspect($dummy) === ['width' => 640, 'height' => 360, 'milliseconds' => 3000], 'The dummy video is not a readable MP4');
+    $reset();
+    $refusal = $publisher->publish(PostRequest::uuid(), 'A video post', [], new VideoAttachment('postslop-video.mp4', 'video/mp4', $dummy, 'A dummy clip', 640, 360, 3000));
+    threads_check($refusal['status'] === 'failed' && str_contains($refusal['error'], 'cannot take videos'), 'Threads did not refuse a video');
+    try {
+        $post = $core->create(PostRequest::fromApi(['text' => 'A video post', 'platforms' => ['threads'], 'video' => ['data' => base64_encode($dummy), 'mimeType' => 'video/mp4']]));
+        threads_check($post['status'] === 'failed' && $post['results'][0]['status'] === 'failed', 'A Threads video post did not fail safely');
+    } catch (Failure $error) {
+        threads_check($error->kind === Failure::INVALID && str_contains($error->getMessage(), 'Threads'), 'The core refused a Threads video without naming Threads');
+    }
+    threads_check($stats()['submissions'] === 0 && $stats()['uploads'] === [] && $stats()['posts'] === [], 'A refused Threads video reached the site');
+
     foreach (['wrong-viewer', 'wrong-profile-id', 'wrong-handle', 'missing-viewer', 'missing-profile', 'expired', 'query-changed', 'upload-failed'] as $scenario) {
         $reset($scenario);
         $request = PostRequest::fromApi(['text' => 'Do not submit', 'platforms' => ['threads'], 'images' => [$attachment]]);
@@ -152,7 +184,7 @@ try {
     threads_check($sent['status'] === 'published' && $stats()['submissions'] === 2, 'CLI --now did not publish synchronously');
     $api->delete('/api/v1/accounts/threads')->assertStatus(200);
     threads_check(!$sessions->summary('threads')['connected'], 'Removing Threads kept its session');
-    echo "Threads checks passed: account identity, cookies, text/images/alt text, limits, safe retries, uncertain outcomes, own queue, HTTP account management, and CLI drafts.\n";
+    echo "Threads checks passed: account identity, cookies, text/images/alt text, limits, safe retries, uncertain outcomes, own queue, HTTP account management, CLI drafts, and video refusals.\n";
 } finally {
     proc_terminate($fake);
     foreach ($pipes as $pipe) { fclose($pipe); }

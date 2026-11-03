@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 require __DIR__ . '/support.php';
 
+use App\Core\Failure;
 use App\Core\PostRequest;
 use App\Core\Publishing;
 use App\Social\DevNullPublisher;
 use App\Social\SessionStore;
+use App\Social\VideoAttachment;
 use Crab\Contracts\Cache\Cache;
 use Crab\Contracts\HttpClient\Client;
 use Crab\Testing\Api;
@@ -17,6 +19,21 @@ function account_check(bool $condition, string $message): void
     if (!$condition) {
         throw new RuntimeException($message);
     }
+}
+
+// A dummy video: the boxes the core reads (ftyp, moov/mvhd, trak/tkhd, mdia/hdlr "vide") and a little media data.
+function account_mp4(int $width = 640, int $height = 360, int $milliseconds = 3000): string
+{
+    $box = static fn(string $type, string $payload): string => pack('N', 8 + strlen($payload)) . $type . $payload;
+    $identity = pack('N9', 0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000);
+    $mvhd = $box('mvhd', "\0\0\0\0" . pack('NNNN', 0, 0, 1000, $milliseconds) . pack('Nn', 0x10000, 0x100)
+        . str_repeat("\0", 10) . $identity . str_repeat("\0", 24) . pack('N', 2));
+    $tkhd = $box('tkhd', "\0\0\0\x03" . pack('NNNNN', 0, 0, 1, 0, $milliseconds) . str_repeat("\0", 8)
+        . pack('nnnn', 0, 0, 0, 0) . $identity . pack('NN', $width << 16, $height << 16));
+    $hdlr = $box('hdlr', "\0\0\0\0" . pack('N', 0) . 'vide' . str_repeat("\0", 12) . "VideoHandler\0");
+    return $box('ftyp', 'isom' . pack('N', 512) . 'isomiso2avc1mp41')
+        . $box('moov', $mvhd . $box('trak', $tkhd . $box('mdia', $hdlr)))
+        . $box('mdat', str_repeat("\0", 64));
 }
 
 $directory = sys_get_temp_dir() . '/postslop-accounts-' . bin2hex(random_bytes(6));
@@ -80,12 +97,27 @@ try {
     $reset('wrong-author');
     $post = $core->create(PostRequest::fromApi(['text' => 'Uncertain author fixture', 'platforms' => ['dev-null']]));
     account_check($post['status'] === 'unknown', 'A different author was accepted as confirmed publication');
+
+    // dev-null.sh's post form takes text and images only: the core refuses a video up front, and the publisher refuses
+    // one it is handed before any request, so the site sees neither a profile check nor a post.
+    $reset();
+    $dummy = account_mp4();
+    $refusal = $publisher->publish(PostRequest::uuid(), 'A video post', [], new VideoAttachment('postslop-video.mp4', 'video/mp4', $dummy, '', 640, 360, 3000));
+    account_check($refusal['status'] === 'failed' && str_contains($refusal['error'], 'cannot take videos'), 'dev-null accepted a video');
+    $refused = false;
+    try {
+        $core->create(PostRequest::fromApi(['text' => 'A video post', 'platforms' => ['dev-null'], 'video' => ['data' => base64_encode($dummy), 'mimeType' => 'video/mp4']]));
+    } catch (Failure $error) {
+        $refused = $error->kind === Failure::INVALID && str_contains($error->getMessage(), 'dev-null.sh');
+    }
+    account_check($refused, 'The core did not refuse a dev-null video up front');
+    account_check($stats()['posts'] === [] && $stats()['checks'] === 0, 'A refused dev-null video reached the site');
     $reset();
     $core->setEnabled('dev-null', false);
     $before = $stats()['checks'];
     $off = $api->post('/api/v1/accounts/dev-null/check', [])->assertStatus(200)->json();
     account_check(!$off['enabled'] && $off['checkedAt'] === null && $stats()['checks'] === $before, 'Disabled account was checked');
-    echo "Account checks passed: individual refresh, caching, authorization, check context, dev-null handle changes, identity refusals, and post verification.\n";
+    echo "Account checks passed: individual refresh, caching, authorization, check context, dev-null handle changes, identity refusals, post verification, and dev-null video refusals.\n";
 } finally {
     proc_terminate($fake);
     foreach ($pipes as $pipe) { fclose($pipe); }

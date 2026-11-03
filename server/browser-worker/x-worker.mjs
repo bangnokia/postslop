@@ -8,8 +8,13 @@ process.umask(0o077);
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const maximumImageBytes = 1024 * 1024;
-const maximumInputBytes = 6 * 1024 * 1024;
+const maximumVideoBytes = 20 * 1024 * 1024;
+// A 20 MiB video arrives as about 27 MiB of base64, beside the session and text.
+const maximumInputBytes = 30 * 1024 * 1024;
 const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const allowedVideoTypes = new Set(['video/mp4', 'video/quicktime']);
+// X processes a video before Post is enabled, so a video gets a longer budget than text and images.
+const operationDeadline = (input) => input?.video ? 150000 : 80000;
 
 class WorkerError extends Error {
   constructor(message, code = 'unavailable') {
@@ -93,7 +98,10 @@ function validateInput(input) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId ?? '')) {
       throw new WorkerError('An X publish request requires a unique request ID.');
     }
-    if (!text.trim() && images.length === 0) throw new WorkerError('Write a post or attach an image first.');
+    if (!text.trim() && images.length === 0 && !input.video) throw new WorkerError('Write a post or attach an image or a video first.');
+  }
+  if (input.video !== undefined && input.video !== null && images.length) {
+    throw new WorkerError('An X post takes images or one video, not both.');
   }
   const attachments = images.map((image) => {
     if (!image || typeof image.filename !== 'string' || image.filename.length < 1 || image.filename.length > 200
@@ -112,6 +120,20 @@ function validateInput(input) {
     if (!signatureMatches) throw new WorkerError('An attached X image does not match its declared file type.');
     return { name: image.filename, mimeType: image.mimeType, buffer, alt: image.alt ?? '' };
   });
+  if (input.video) {
+    const video = input.video;
+    if (typeof video.filename !== 'string' || video.filename.length < 1 || video.filename.length > 200
+      || /[\0\/\\]/.test(video.filename) || !allowedVideoTypes.has(video.mimeType)
+      // A linear check: the grouped pattern used for images overflows the regex stack on a video's millions of characters.
+      || typeof video.data !== 'string' || video.data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(video.data)) {
+      throw new WorkerError('The attached X video is invalid.');
+    }
+    const buffer = Buffer.from(video.data, 'base64');
+    if (buffer.length < 12 || buffer.length > maximumVideoBytes) throw new WorkerError('The X video must be between 12 bytes and 20 MiB.');
+    if (buffer.toString('ascii', 4, 8) !== 'ftyp') throw new WorkerError('The attached X video is not an MP4 or MOV file.');
+    // X's composer has no description field for videos, so none is set or checked.
+    attachments.push({ name: video.filename, mimeType: video.mimeType, buffer, alt: '', video: true });
+  }
   return { ...input, baseUrl, text, attachments };
 }
 
@@ -209,6 +231,7 @@ function postResult(body, handle, input) {
   if (input.attachments.length) {
     if (!Array.isArray(media) || media.length !== input.attachments.length) return null;
     if (input.attachments.some((attachment, index) => attachment.alt && media[index].ext_alt_text !== attachment.alt)) return null;
+    if (input.attachments.some((attachment, index) => attachment.video && !['video', 'animated_gif'].includes(media[index]?.type))) return null;
   }
   // X appends media URLs and expands URLs in its response, so only compare exact plain text.
   if (!/https?:\/\//i.test(input.text)) {
@@ -245,14 +268,25 @@ async function publish(page, input, handle, markSubmitted, diagnostic) {
   }
   if (input.text.trim()) await composerDialog.getByText(/^What['’]s happening\?$/)
     .waitFor({ state: 'hidden', timeout: 5000 });
-  diagnostic.stage = 'images';
+  const video = input.attachments.some((attachment) => attachment.video);
+  diagnostic.stage = video ? 'video' : 'images';
   try { await addImages(page, composerDialog, input); }
-  catch { throw new WorkerError('Postslop could not attach every image and its alt text in X. Nothing was posted.', 'image_failed'); }
-  diagnostic.stage = 'compose';
+  catch {
+    throw video
+      ? new WorkerError('Postslop could not attach the video in X. Nothing was posted.', 'video_failed')
+      : new WorkerError('Postslop could not attach every image and its alt text in X. Nothing was posted.', 'image_failed');
+  }
   const publishButton = composerDialog.locator('[data-testid="tweetButton"]');
   await publishButton.waitFor({ state: 'visible' });
-  await composerDialog.locator('[data-testid="tweetButton"]:not([disabled]):not([aria-disabled="true"])')
-    .waitFor({ state: 'visible', timeout: 20000 });
+  // X keeps Post disabled while it uploads and processes a video.
+  try {
+    await composerDialog.locator('[data-testid="tweetButton"]:not([disabled]):not([aria-disabled="true"])')
+      .waitFor({ state: 'visible', timeout: video ? (process.env.POSTSLOP_TEST_MODE === '1' ? 4000 : 110000) : 20000 });
+  } catch (error) {
+    if (video) throw new WorkerError('X did not finish processing the video in time. Nothing was posted.', 'video_failed');
+    throw error;
+  }
+  diagnostic.stage = 'compose';
   await requireNoChallenge(page);
   diagnostic.stage = 'submit';
   if (input.prepareOnly) {
@@ -377,7 +411,7 @@ export async function runWorker(rawInput) {
         reject(new WorkerError(submitted
           ? 'Postslop timed out after submitting to X. Check your profile before trying again; this request will not be resubmitted.'
           : 'Postslop’s background X operation timed out before submission. Nothing was posted.'));
-      }, 80000);
+      }, operationDeadline(input));
     });
     const result = await Promise.race([work(), timeout]);
     if (submitted) await privateJson(journalPath, { submitted: true, result });
@@ -385,7 +419,8 @@ export async function runWorker(rawInput) {
   } catch (error) {
     const failureCode = error instanceof WorkerError ? error.code
       : diagnostic.stage === 'compose' ? 'composer_unavailable'
-        : diagnostic.stage === 'images' ? 'image_failed' : 'unavailable';
+        : diagnostic.stage === 'images' ? 'image_failed'
+          : diagnostic.stage === 'video' ? 'video_failed' : 'unavailable';
     if (input && unlock) {
       const screenshotPath = join(input.profilePath, 'last-error.png');
       await rm(screenshotPath, { force: true }).catch(() => {});
@@ -433,9 +468,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     clearTimeout(hardDeadline);
     process.stdout.write(`${JSON.stringify(result)}\n`, () => process.exit(0));
   };
-  const hardDeadline = setTimeout(() => respond(operation === 'status'
+  const lateResult = () => respond(operation === 'status'
     ? { id: 'x', label: 'X', available: false, code: 'unavailable', reason: 'Postslop’s background X check timed out.' }
-    : { platform: 'x', status: 'unknown', code: 'unknown', error: 'Postslop could not confirm the X result before its deadline. Check your profile before trying again.' }), 88000);
+    : { platform: 'x', status: 'unknown', code: 'unknown', error: 'Postslop could not confirm the X result before its deadline. Check your profile before trying again.' });
+  // Eight seconds past the operation's own deadline, so its outcome is reported first.
+  let hardDeadline = setTimeout(lateResult, 88000);
   try {
     process.stdin.setEncoding('utf8');
     for await (const chunk of process.stdin) {
@@ -444,6 +481,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     }
     const input = JSON.parse(raw);
     operation = input.operation;
+    clearTimeout(hardDeadline);
+    hardDeadline = setTimeout(lateResult, operationDeadline(input) + 8000);
     respond(await runWorker(input));
   } catch {
     respond({ platform: 'x', status: 'failed', code: 'invalid_request', error: 'Postslop received an invalid X worker request.' });

@@ -71,7 +71,7 @@ final readonly class Tools
                 'inputSchema' => self::object(['requestId' => $id, ...$content], ['requestId', 'text', 'platforms']),
             ],
             'postslop_update_draft' => [
-                'description' => 'Replace all text, destinations and images of an editable post and return it to draft, clearing any schedule. Send all images to keep, or [] to remove them. Read the post first. Schedule again explicitly if wanted.',
+                'description' => 'Replace all text, destinations, images and video of an editable post and return it to draft, clearing any schedule. Send all images to keep, or [] to remove them; omit video to remove it. Read the post first. Schedule again explicitly if wanted.',
                 'inputSchema' => self::object(['id' => $id, ...$content], ['id', 'text', 'platforms', 'images']),
             ],
             'postslop_schedule_post' => [
@@ -168,6 +168,14 @@ final readonly class Tools
                     'mimeType' => ['type' => 'string', 'enum' => ['image/jpeg', 'image/png', 'image/webp']],
                     'alt' => ['type' => 'string', 'maxLength' => 1000],
                 ], ['data', 'alt']),
+            ],
+            'video' => [
+                ...self::object([
+                    'data' => ['type' => 'string', 'maxLength' => 27_962_028],
+                    'mimeType' => ['type' => 'string', 'enum' => ['video/mp4', 'video/quicktime']],
+                    'alt' => ['type' => 'string', 'maxLength' => 1000],
+                ], ['data']),
+                'description' => 'One MP4 or MOV video of at most 20 MiB, as base64 bytes, instead of images. Only for destinations whose maxVideoSeconds in postslop_accounts is set; the video must not run longer than any of them.',
             ],
         ];
     }

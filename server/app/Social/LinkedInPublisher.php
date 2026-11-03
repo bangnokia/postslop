@@ -16,6 +16,8 @@ use Psr\Http\Client\ClientExceptionInterface;
 // @mago-expect lint:too-many-methods,cyclomatic-complexity,kan-defect
 final readonly class LinkedInPublisher implements Publisher
 {
+    // LinkedIn refuses shorter videos.
+    private const int MIN_VIDEO_MILLISECONDS = 3000;
     // Used only when the import did not record the browser's own User-Agent.
     private const string USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
@@ -43,16 +45,11 @@ final readonly class LinkedInPublisher implements Publisher
         }
     }
 
-    public function publish(string $requestId, string $text, array $images): array
+    public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
     {
         $submitted = false;
         try {
-            if (mb_strlen($text) > 3000) {
-                throw new RemoteSessionFailure('LinkedIn allows up to 3,000 characters.');
-            }
-            if ($images === [] && trim($text) === '') {
-                throw new RemoteSessionFailure('LinkedIn needs text or an image.');
-            }
+            self::refuseUnfit($text, $images, $video);
             $session = $this->connect();
             $media = [];
             foreach ($images as $image) {
@@ -61,6 +58,14 @@ final readonly class LinkedInPublisher implements Publisher
                     'mediaUrn' => $this->upload($session, $image),
                     'tapTargets' => [],
                     'altText' => $image->alt,
+                ];
+            }
+            if ($video !== null) {
+                // LinkedIn processes the video after the post is created; its feed shows it once ready.
+                $media[] = [
+                    'category' => 'VIDEO',
+                    'mediaUrn' => $this->uploadVideo($session, $video),
+                    'tapTargets' => [],
                 ];
             }
             $submitted = true;
@@ -151,6 +156,178 @@ final readonly class LinkedInPublisher implements Publisher
             throw new RemoteSessionFailure('LinkedIn did not store the image. No post was submitted.');
         }
         return $urn;
+    }
+
+    /**
+     * Registers a video with LinkedIn's media service and uploads it, whole or in the parts LinkedIn asks for, so
+     * the post can refer to it by URN. Nothing is shared until every byte is stored.
+     *
+     * @param array{url: string, client: Client, cookie: string, csrf: string, agent: string, handle: string} $session
+     */
+    private function uploadVideo(array $session, VideoAttachment $video): string
+    {
+        $response = $session['client']->post(
+            $session['url'] . '/voyager/api/voyagerVideoDashMediaUploadMetadata?action=upload',
+            json: [
+                'mediaUploadType' => 'VIDEO_SHARING',
+                'fileSize' => strlen($video->bytes),
+                'filename' => $video->filename,
+            ],
+            headers: $this->headers($session),
+        );
+        $data = self::json($response);
+        $value = $data['data']['value'] ?? $data['value'] ?? null;
+        $urn = is_array($value) ? $value['urn'] ?? null : null;
+        if (!$response->ok() || !is_string($urn)) {
+            throw new RemoteSessionFailure('LinkedIn did not accept the video upload. No post was submitted.');
+        }
+        // A video can take longer to send than LinkedIn's other requests.
+        $client = $this->http->timeout(120)->retry(6, delay: 0.25);
+        if (is_string($value['singleUploadUrl'] ?? null)) {
+            $this->put($session, $client, $value['singleUploadUrl'], $value['singleUploadHeaders'] ?? [], $video);
+            return $urn;
+        }
+        $artifact = $value['mediaArtifactUrn'] ?? null;
+        $parts = $this->videoParts($session, $value['multipartMetadata']['partUploadRequests'] ?? null, $video);
+        if (!is_string($artifact)) {
+            throw new RemoteSessionFailure('LinkedIn did not say where to upload the video. No post was submitted.');
+        }
+        $answers = [];
+        foreach ($parts as [$target, $headers, $offset, $length]) {
+            $uploaded = $this->put(
+                $session,
+                $client,
+                $target,
+                $headers,
+                $video,
+                substr($video->bytes, $offset, $length),
+            );
+            $etag = $uploaded->getHeaderLine('ETag');
+            if ($etag === '') {
+                throw new RemoteSessionFailure('LinkedIn did not confirm part of the video. No post was submitted.');
+            }
+            $answers[] = ['headers' => ['ETag' => $etag], 'httpStatusCode' => $uploaded->getStatusCode()];
+        }
+        $completed = $session['client']->post(
+            $session['url'] . '/voyager/api/voyagerVideoDashMediaUploadMetadata?action=completeMultipartUpload',
+            json: ['mediaArtifactUrn' => $artifact, 'partUploadResponses' => $answers],
+            headers: $this->headers($session),
+        );
+        if (!$completed->ok()) {
+            throw new RemoteSessionFailure('LinkedIn did not finish storing the video. No post was submitted.');
+        }
+        return $urn;
+    }
+
+    /**
+     * Refuses, before anything is sent, a post LinkedIn would not take.
+     *
+     * @param list<ImageAttachment> $images
+     */
+    private static function refuseUnfit(string $text, array $images, ?VideoAttachment $video): void
+    {
+        if (mb_strlen($text) > 3000) {
+            throw new RemoteSessionFailure('LinkedIn allows up to 3,000 characters.');
+        }
+        if ($images === [] && $video === null && trim($text) === '') {
+            throw new RemoteSessionFailure('LinkedIn needs text, an image or a video.');
+        }
+        if ($video !== null && $images !== []) {
+            throw new RemoteSessionFailure('LinkedIn takes images or one video, not both. Nothing was posted.');
+        }
+        if ($video !== null && $video->milliseconds < self::MIN_VIDEO_MILLISECONDS) {
+            throw new RemoteSessionFailure('LinkedIn needs videos of at least 3 seconds. Nothing was posted.');
+        }
+    }
+
+    /**
+     * The parts LinkedIn asked for, all checked before any is sent: they must follow each other from the first byte
+     * to the last, on LinkedIn's own hosts, so the video arrives whole and the cookies never leave LinkedIn.
+     *
+     * @param array{url: string, client: Client, cookie: string, csrf: string, agent: string, handle: string} $session
+     * @return list<array{0: string, 1: mixed, 2: int, 3: int}> Each part's address, headers, offset and length.
+     */
+    private function videoParts(array $session, mixed $parts, VideoAttachment $video): array
+    {
+        if (!is_array($parts) || !array_is_list($parts) || $parts === []) {
+            throw new RemoteSessionFailure('LinkedIn did not say where to upload the video. No post was submitted.');
+        }
+        $size = strlen($video->bytes);
+        $ranges = [];
+        $next = 0;
+        foreach ($parts as $part) {
+            $target = is_array($part) ? $part['url'] ?? null : null;
+            $first = is_array($part) ? $part['byteRange']['firstByte'] ?? null : null;
+            $last = is_array($part) ? $part['byteRange']['lastByte'] ?? null : null;
+            if (!is_string($target) || $first !== $next || !is_int($last) || $last < $first || $last >= $size) {
+                throw new RemoteSessionFailure(
+                    'LinkedIn asked for video parts Postslop could not match. No post was submitted.',
+                );
+            }
+            if (!$this->ownHost($session['url'], $target)) {
+                throw new RemoteSessionFailure(
+                    'LinkedIn named a video upload address outside LinkedIn. No post was submitted.',
+                );
+            }
+            $ranges[] = [$target, $part['headers'] ?? [], $first, $last - $first + 1];
+            $next = $last + 1;
+        }
+        if ($next !== $size) {
+            throw new RemoteSessionFailure(
+                'LinkedIn asked for video parts Postslop could not match. No post was submitted.',
+            );
+        }
+        return $ranges;
+    }
+
+    /**
+     * Sends video bytes to an upload address LinkedIn named, with the headers it asked for.
+     *
+     * @param array{url: string, client: Client, cookie: string, csrf: string, agent: string, handle: string} $session
+     */
+    // Each argument is one part of the request LinkedIn described.
+    // @mago-expect lint:excessive-parameter-list
+    private function put(
+        array $session,
+        Client $client,
+        string $target,
+        mixed $requested,
+        VideoAttachment $video,
+        ?string $bytes = null,
+    ): Response {
+        if (!$this->ownHost($session['url'], $target)) {
+            throw new RemoteSessionFailure(
+                'LinkedIn named a video upload address outside LinkedIn. No post was submitted.',
+            );
+        }
+        $headers = [];
+        foreach (is_array($requested) ? $requested : [] as $name => $value) {
+            if (!is_string($name) || !is_string($value) && !is_int($value)) {
+                continue;
+            }
+            $headers[$name] = (string) $value;
+        }
+        // LinkedIn's own content type wins, since its upload address may be signed for it.
+        $typed = array_filter(
+            array_keys($headers),
+            static fn(string $name): bool => strtolower($name) === 'content-type',
+        );
+        $uploaded = $client->request(
+            'PUT',
+            $target,
+            headers: [
+                ...$headers,
+                ...($typed === [] ? ['Content-Type' => $video->mimeType] : []),
+                'Cookie' => $session['cookie'],
+                'csrf-token' => $session['csrf'],
+                'User-Agent' => $session['agent'],
+            ],
+            body: $bytes ?? $video->bytes,
+        );
+        if (!$uploaded->ok()) {
+            throw new RemoteSessionFailure('LinkedIn did not store the video. No post was submitted.');
+        }
+        return $uploaded;
     }
 
     /** @return array{url: string, client: Client, cookie: string, csrf: string, agent: string, handle: string} */

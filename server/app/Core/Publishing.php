@@ -9,6 +9,7 @@ use App\PrivateFiles;
 use App\Social\ImageAttachment;
 use App\Social\Publisher;
 use App\Social\SessionStore;
+use App\Social\VideoAttachment;
 use Crab\Contracts\Cache\Cache;
 use Crab\Contracts\Database\Connection;
 use Crab\Contracts\Database\Database;
@@ -27,7 +28,13 @@ final readonly class Publishing
     private const array EDITABLE = ['draft', 'scheduled'];
     // A delivery waiting longer than this was never picked up, so it is failed: nothing was sent.
     private const int STALE_SECONDS = 900;
-    private const array EXTENSIONS = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+    private const array EXTENSIONS = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'video/mp4' => 'mp4',
+        'video/quicktime' => 'mov',
+    ];
 
     /**
      * @param array<string, Publisher> $publishers
@@ -70,7 +77,11 @@ final readonly class Publishing
     {
         return [
             'platforms' => array_map($this->account(...), array_keys($this->publishers)),
-            'limits' => ['maxImages' => PostRequest::MAX_IMAGES, 'maxImageBytes' => PostRequest::MAX_IMAGE_BYTES],
+            'limits' => [
+                'maxImages' => PostRequest::MAX_IMAGES,
+                'maxImageBytes' => PostRequest::MAX_IMAGE_BYTES,
+                'maxVideoBytes' => PostRequest::MAX_VIDEO_BYTES,
+            ],
             'publishingEnabled' => true,
         ];
     }
@@ -89,6 +100,8 @@ final readonly class Publishing
                 'checkedAt' => null,
                 'maxImages' => Platforms::maxImages([$id]),
                 'textLimit' => Platforms::TEXT_LIMITS[$id] ?? null,
+                // Null when the site takes no videos from Postslop.
+                'maxVideoSeconds' => Platforms::VIDEO_SECONDS[$id] ?? null,
             ];
             // An account without a session, or turned off, is not checked: it is not used as it is.
             if (!$account['connected'] || !$account['enabled']) {
@@ -244,7 +257,7 @@ final readonly class Publishing
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
-            $this->storeImages($tx, $request->requestId, $request->images);
+            $this->storeMedia($tx, $request->requestId, $request->images, $request->video);
         });
     }
 
@@ -269,7 +282,7 @@ final readonly class Publishing
                 ]);
             $this->stillEditable($changed);
             $this->removeImages($tx, $id);
-            $this->storeImages($tx, $id, $request->images);
+            $this->storeMedia($tx, $id, $request->images, $request->video);
         });
         return $request->mode === 'now' ? $this->publish($id) : $this->find($id);
     }
@@ -467,7 +480,7 @@ final readonly class Publishing
     private function send(string $id, string $platform, string $text): array
     {
         try {
-            return $this->publishers[$platform]->publish($id, $text, $this->images($id));
+            return $this->publishers[$platform]->publish($id, $text, $this->images($id), $this->video($id));
         } catch (\Throwable) {
             return [
                 'platform' => $platform,
@@ -743,18 +756,24 @@ final readonly class Publishing
         $ids = array_column($rows, 'id');
         $deliveries = [];
         $media = [];
+        $videos = [];
         if ($ids !== []) {
             foreach ($this->db->table('deliveries')->whereIn('post_id', $ids)->orderBy('position')->get() as $row) {
                 $deliveries[$row['post_id']][] = json_decode($row['result'], true, flags: JSON_THROW_ON_ERROR);
             }
             foreach ($this->db->table('media')->whereIn('post_id', $ids)->orderBy('position')->get() as $row) {
-                $media[$row['post_id']][] = [
+                $item = [
                     'id' => $row['id'],
                     'mimeType' => $row['mime_type'],
                     'width' => (int) $row['width'],
                     'height' => (int) $row['height'],
                     'alt' => $row['alt'],
                 ];
+                if (self::isVideo($row)) {
+                    $videos[$row['post_id']] = $item;
+                    continue;
+                }
+                $media[$row['post_id']][] = $item;
             }
         }
         return array_map(static fn(array $row): array => [
@@ -764,6 +783,7 @@ final readonly class Publishing
             'text' => $row['text'],
             'platforms' => json_decode($row['platforms'], true, flags: JSON_THROW_ON_ERROR),
             'images' => $media[$row['id']] ?? [],
+            'video' => $videos[$row['id']] ?? null,
             'results' => $deliveries[$row['id']] ?? [],
             'scheduledAt' => $row['scheduled_at'],
             'publishedAt' => $row['published_at'],
@@ -773,24 +793,31 @@ final readonly class Publishing
     }
 
     /**
+     * A video is stored like an image, after any images; a post never has both.
+     *
      * @param list<ImageAttachment> $images
      */
-    private function storeImages(Connection $tx, string $postId, array $images): void
+    private function storeMedia(Connection $tx, string $postId, array $images, ?VideoAttachment $video): void
     {
-        foreach ($images as $position => $image) {
+        foreach ([...$images, ...($video === null ? [] : [$video])] as $position => $attachment) {
             $row = [
                 'id' => PostRequest::uuid(),
                 'post_id' => $postId,
                 'position' => $position,
-                'mime_type' => $image->mimeType,
-                'width' => $image->width,
-                'height' => $image->height,
-                'alt' => $image->alt,
-                'sha256' => hash('sha256', $image->bytes),
+                'mime_type' => $attachment->mimeType,
+                'width' => $attachment->width,
+                'height' => $attachment->height,
+                'alt' => $attachment->alt,
+                'sha256' => hash('sha256', $attachment->bytes),
             ];
-            PrivateFiles::write($this->mediaPath($row), $image->bytes);
+            PrivateFiles::write($this->mediaPath($row), $attachment->bytes);
             $tx->table('media')->insert($row);
         }
+    }
+
+    private static function isVideo(array $row): bool
+    {
+        return str_starts_with($row['mime_type'], 'video/');
     }
 
     private function removeImages(Connection $tx, string $postId): void
@@ -813,6 +840,9 @@ final readonly class Publishing
     {
         $images = [];
         foreach ($this->db->table('media')->where('post_id', $postId)->orderBy('position')->get() as $row) {
+            if (self::isVideo($row)) {
+                continue;
+            }
             $path = $this->mediaPath($row);
             $bytes = is_file($path) ? file_get_contents($path) : false;
             if ($bytes === false || !hash_equals($row['sha256'], hash('sha256', $bytes))) {
@@ -828,6 +858,31 @@ final readonly class Publishing
             );
         }
         return $images;
+    }
+
+    private function video(string $postId): ?VideoAttachment
+    {
+        foreach ($this->db->table('media')->where('post_id', $postId)->orderBy('position')->get() as $row) {
+            if (!self::isVideo($row)) {
+                continue;
+            }
+            $path = $this->mediaPath($row);
+            $bytes = is_file($path) ? file_get_contents($path) : false;
+            $info = $bytes === false ? null : VideoFile::inspect($bytes);
+            if ($info === null || !hash_equals($row['sha256'], hash('sha256', $bytes))) {
+                throw Failure::invalid('The attached video is missing or changed. Attach it again.');
+            }
+            return new VideoAttachment(
+                'postslop-video.' . self::EXTENSIONS[$row['mime_type']],
+                $row['mime_type'],
+                $bytes,
+                $row['alt'],
+                (int) $row['width'],
+                (int) $row['height'],
+                $info['milliseconds'],
+            );
+        }
+        return null;
     }
 
     private function mediaPath(array $row): string

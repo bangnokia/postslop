@@ -142,7 +142,7 @@ function Chip({ post, onOpen, compact = false }: { post: Post; onOpen: (id: stri
           ))}
         </span>
       )}
-      <span className="cal-chip-text">{post.text || "Images only"}</span>
+      <span className="cal-chip-text">{post.text || (post.video ? "Video only" : "Images only")}</span>
     </button>
   );
 }

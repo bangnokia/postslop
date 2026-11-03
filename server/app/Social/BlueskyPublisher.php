@@ -6,15 +6,23 @@ namespace App\Social;
 
 use Crab\Contracts\HttpClient\Client;
 use Crab\Contracts\HttpClient\Response;
+use Crab\Engine\Async\Async;
+use Crab\Engine\EventLoop;
 use Psr\Http\Client\ClientExceptionInterface;
 
 // Keep the remote protocol checks together so every transition and ambiguous-write outcome is visible.
-// @mago-expect lint:cyclomatic-complexity,kan-defect,halstead
+// @mago-expect lint:cyclomatic-complexity,kan-defect,halstead,too-many-methods
 final readonly class BlueskyPublisher implements Publisher
 {
+    /**
+     * @param float $videoPollSeconds How long to wait between checks on Bluesky's processing of a video.
+     * @param float $videoWaitSeconds How long processing may take before the post is given up, unsent.
+     */
     public function __construct(
         private Client $http,
         private SessionStore $sessions,
+        private float $videoPollSeconds = 1.5,
+        private float $videoWaitSeconds = 100.0,
     ) {}
 
     public function status(): array
@@ -39,7 +47,7 @@ final readonly class BlueskyPublisher implements Publisher
         }
     }
 
-    public function publish(string $requestId, string $text, array $images): array
+    public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
     {
         $submitted = false;
         try {
@@ -49,6 +57,9 @@ final readonly class BlueskyPublisher implements Publisher
             if (count($images) > 4) {
                 throw new RemoteSessionFailure('Bluesky allows up to four images per post.');
             }
+            if ($video !== null && $images !== []) {
+                throw new RemoteSessionFailure('A Bluesky post takes images or one video, not both.');
+            }
             $session = $this->connect();
             $client = $this->http->timeout(35)->retry(0);
             $headers = ['Authorization' => 'Bearer ' . $session['account']['accessJwt']];
@@ -57,6 +68,10 @@ final readonly class BlueskyPublisher implements Publisher
                 'text' => $text,
                 'createdAt' => gmdate('Y-m-d\TH:i:s\Z'),
             ];
+            // A post carries images or one video, never both (checked above).
+            if ($video !== null) {
+                $record['embed'] = $this->videoEmbed($session, $video);
+            }
             if ($images !== []) {
                 $uploaded = [];
                 foreach ($images as $image) {
@@ -127,6 +142,129 @@ final readonly class BlueskyPublisher implements Publisher
                     : 'Bluesky could not be reached. No post was submitted.',
             ];
         }
+    }
+
+    /**
+     * Sends the video through Bluesky's video service, which processes it and stores it on the account's PDS, and
+     * waits for the result. Nothing here creates a post, so every failure leaves nothing published.
+     *
+     * @param array{url: string, account: array<string, mixed>} $session
+     */
+    private function videoEmbed(array $session, VideoAttachment $video): array
+    {
+        $client = $this->http->timeout(20)->retry(0);
+        // The video service stores the processed blob on the PDS, so the PDS authorizes that upload in advance.
+        $pds = parse_url($session['url']);
+        $authorization = $client->get(
+            $session['url'] . '/xrpc/com.atproto.server.getServiceAuth',
+            query: [
+                'aud' => 'did:web:' . $pds['host'] . (($pds['port'] ?? null) !== null ? ':' . $pds['port'] : ''),
+                'lxm' => 'com.atproto.repo.uploadBlob',
+                'exp' => time() + 1800,
+            ],
+            headers: ['Authorization' => 'Bearer ' . $session['account']['accessJwt']],
+        );
+        $token = $this->json($authorization)['token'] ?? null;
+        if (!$authorization->ok() || !is_string($token) || $token === '') {
+            throw new RemoteSessionFailure('Bluesky did not authorize the video upload. No post was submitted.');
+        }
+        $service = $this->videoServiceUrl();
+        $upload = $this->http
+            ->timeout(90)
+            ->retry(0)
+            ->request(
+                'POST',
+                $service . '/xrpc/app.bsky.video.uploadVideo',
+                query: ['did' => $session['account']['did'], 'name' => $video->filename],
+                headers: ['Authorization' => 'Bearer ' . $token, 'Content-Type' => $video->mimeType],
+                body: $video->bytes,
+            );
+        $job = $this->jobStatus($this->json($upload));
+        // A video Bluesky already holds answers 409 with its earlier job, which is followed like a new one.
+        if (
+            !$upload->ok() && $upload->getStatusCode() !== 409
+            || !is_string($job['jobId'] ?? null)
+            || $job['jobId'] === ''
+        ) {
+            throw new RemoteSessionFailure(self::videoRefusal($upload->getStatusCode()));
+        }
+        $jobId = $job['jobId'];
+        $deadline = microtime(true) + $this->videoWaitSeconds;
+        while (($job['state'] ?? '') !== 'JOB_STATE_COMPLETED' || !is_string($job['blob']['ref']['$link'] ?? null)) {
+            if (($job['state'] ?? '') === 'JOB_STATE_FAILED') {
+                throw new RemoteSessionFailure('Bluesky could not process the video. No post was submitted.');
+            }
+            if (microtime(true) >= $deadline) {
+                throw new RemoteSessionFailure(
+                    'Bluesky is still processing the video. No post was submitted; try again in a few minutes.',
+                );
+            }
+            Async::sleep(EventLoop::current(), $this->videoPollSeconds);
+            $status = $client->get($service . '/xrpc/app.bsky.video.getJobStatus', query: ['jobId' => $jobId]);
+            $job = $this->jobStatus($this->json($status));
+            if (!$status->ok() || ($job['jobId'] ?? $jobId) !== $jobId) {
+                throw new RemoteSessionFailure('Bluesky stopped reporting on the video. No post was submitted.');
+            }
+        }
+        $embed = [
+            '$type' => 'app.bsky.embed.video',
+            'video' => $job['blob'],
+            'aspectRatio' => ['width' => $video->width, 'height' => $video->height],
+        ];
+        if ($video->alt !== '') {
+            $embed['alt'] = $video->alt;
+        }
+        return $embed;
+    }
+
+    /**
+     * The video service answers an upload with a bare job status and a status check with one wrapped in jobStatus;
+     * either is read the same way.
+     */
+    private function jobStatus(array $data): array
+    {
+        return is_array($data['jobStatus'] ?? null) ? $data['jobStatus'] : $data;
+    }
+
+    private static function videoRefusal(int $code): string
+    {
+        return match (true) {
+            $code === 413 => 'Bluesky refused the video as too large. No post was submitted.',
+            $code === 429
+                => 'Bluesky’s daily video upload limit is reached. No post was submitted; try again tomorrow.',
+            $code >= 400 && $code < 500
+                => "Bluesky refused the video (HTTP {$code}). Bluesky only takes videos from accounts with a verified email address. No post was submitted.",
+            default => "Bluesky could not receive the video (HTTP {$code}). No post was submitted.",
+        };
+    }
+
+    private function videoServiceUrl(): string
+    {
+        $pds = (string) config('postslop.bluesky_url');
+        $url = rtrim((string) config('postslop.bluesky_video_url'), '/');
+        // A local stand-in PDS also stands in for the video service, so a test never sends a video to Bluesky.
+        if ($pds !== '' && self::loopback($pds) && !self::loopback($url)) {
+            return rtrim($pds, '/');
+        }
+        $parts = parse_url($url);
+        if (
+            !is_array($parts)
+            || ($parts['host'] ?? '') === ''
+            || ($parts['scheme'] ?? '') !== 'https' && !(self::loopback($url) && ($parts['scheme'] ?? '') === 'http')
+            || array_key_exists('user', $parts)
+            || array_key_exists('query', $parts)
+            || array_key_exists('fragment', $parts)
+        ) {
+            throw new RemoteSessionFailure(
+                'The Bluesky video service URL is invalid. Check POSTSLOP_BLUESKY_VIDEO_URL. No post was submitted.',
+            );
+        }
+        return $url;
+    }
+
+    private static function loopback(string $url): bool
+    {
+        return in_array(parse_url($url, PHP_URL_HOST) ?? '', ['127.0.0.1', 'localhost', '[::1]'], true);
     }
 
     /** @return array{url: string, account: array<string, mixed>} */

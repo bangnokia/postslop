@@ -7,10 +7,27 @@ require __DIR__ . '/support.php';
 use App\Core\PostRequest;
 use App\Core\Publishing;
 use App\Social\Publisher;
+use App\Social\VideoAttachment;
 use Crab\Http\Request;
 use Crab\Queue\Consumer;
 use Crab\Testing\Api;
 use Crab\Testing\ApiResponse;
+
+/**
+ * A dummy MP4 with only the boxes the core reads: ftyp, mvhd, and a video track's tkhd and hdlr.
+ */
+function mcp_mp4(int $width, int $height, int $milliseconds): string
+{
+    $box = static fn(string $type, string $payload): string => pack('N', 8 + strlen($payload)) . $type . $payload;
+    $matrix = pack('N9', 0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000);
+    $mvhd = $box('mvhd', "\0\0\0\0" . pack('N4', 0, 0, 1000, $milliseconds) . str_repeat("\0", 80));
+    $tkhd = $box('tkhd', "\0\0\0\x03" . pack('N5', 0, 0, 1, 0, $milliseconds) . str_repeat("\0", 16) . $matrix
+        . pack('N2', $width << 16, $height << 16));
+    $hdlr = $box('hdlr', str_repeat("\0", 8) . 'vide' . str_repeat("\0", 12) . "VideoHandler\0");
+    return $box('ftyp', 'isom' . pack('N', 512) . 'isomiso2avc1mp41')
+        . $box('moov', $mvhd . $box('trak', $tkhd . $box('mdia', $hdlr)))
+        . $box('mdat', str_repeat("\x07", 256));
+}
 
 function mcp_check(bool $condition, string $message): void
 {
@@ -48,7 +65,7 @@ $publisher = new class implements Publisher {
         return ['id' => 'bluesky', 'label' => 'Bluesky', 'available' => true, 'handle' => 'fixture'];
     }
 
-    public function publish(string $requestId, string $text, array $images): array
+    public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
     {
         $this->calls++;
         return [
@@ -189,6 +206,30 @@ try {
     mcp_call($api, 'postslop_list_posts', ['statuses' => [
         'draft',
     ]])->assertJson('result.structuredContent.posts.0.id', $id);
+    // An agent attaches a video as base64; it is drafted like any post, and refused for a site that takes none.
+    $clip = ['data' => base64_encode(mcp_mp4(720, 1280, 6000)), 'mimeType' => 'video/mp4', 'alt' => 'A dummy clip'];
+    mcp_call($api, 'postslop_create_draft', [
+        'requestId' => PostRequest::uuid(),
+        'text' => 'A video draft from an agent',
+        'platforms' => ['bluesky'],
+        'video' => $clip,
+    ])
+        ->assertJson('result.isError', false)
+        ->assertJson('result.structuredContent.status', 'draft')
+        ->assertJson('result.structuredContent.video.height', 1280);
+    mcp_call($api, 'postslop_create_draft', [
+        'requestId' => PostRequest::uuid(),
+        'text' => 'x',
+        'platforms' => ['dev-null'],
+        'video' => $clip,
+    ])->assertJson('result.structuredContent.error.code', 'invalid');
+    mcp_call($api, 'postslop_create_draft', [
+        'requestId' => PostRequest::uuid(),
+        'text' => 'x',
+        'platforms' => ['bluesky'],
+        'video' => ['data' => $clip['data'], 'mimeType' => 'video/webm'],
+    ])->assertJson('result.isError', true);
+    mcp_check($publisher->calls === 0, 'Creating a video draft published it');
     mcp_call($api, 'postslop_get_post', [
         'id' => PostRequest::uuid(),
     ])->assertJson('result.isError', true)->assertJson('result.structuredContent.error.code', 'not_found');
@@ -343,7 +384,7 @@ try {
         ->post('/api/v1/mcp', $ping)
         ->assertStatus(200);
     echo
-        "MCP checks passed: protocol, authentication, origin, strict inputs, drafts, images, schedules, queues, idempotency, and unknown deliveries.\n";
+        "MCP checks passed: protocol, authentication, origin, strict inputs, drafts, images, videos, schedules, queues, idempotency, and unknown deliveries.\n";
 } finally {
     test_remove($directory);
 }

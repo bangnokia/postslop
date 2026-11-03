@@ -1,4 +1,4 @@
-import type { NewImage, Platform } from "./api";
+import type { NewImage, NewVideo, Platform } from "./api";
 
 // crypto.randomUUID() exists only on https or localhost, and Postslop may be opened over plain http on another machine.
 export function uuid(): string {
@@ -56,6 +56,55 @@ export async function prepareImage(file: File): Promise<NewImage> {
   }
 }
 
+// Postslop takes videos up to 20 MiB; a larger one is refused here, before it is read.
+export const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
+export const VIDEO_TYPES = ["video/mp4", "video/quicktime"];
+
+export function isVideoFile(file: File): boolean {
+  return VIDEO_TYPES.includes(file.type) || /\.(mp4|m4v|mov)$/i.test(file.name);
+}
+
+const mebibytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+
+/**
+ * Reads a picked or dropped MP4 or MOV as base64, unchanged: videos are never recompressed in the browser. The
+ * type comes from the file's own header, as Postslop checks it, not from its name.
+ */
+export async function prepareVideo(file: File, maxBytes = MAX_VIDEO_BYTES): Promise<NewVideo> {
+  if (file.size === 0) throw new Error("This video file is empty.");
+  if (file.size > maxBytes) throw new Error(`This video is ${mebibytes(file.size)}. Postslop takes videos up to ${Math.floor(maxBytes / 1024 / 1024)} MiB; compress it first.`);
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const text = (from: number, to: number) => String.fromCharCode(...header.slice(from, to));
+  if (text(4, 8) !== "ftyp") throw new Error("Choose an MP4 or MOV video.");
+  const mimeType = text(8, 12) === "qt  " ? "video/quicktime" : "video/mp4";
+  const data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => reject(new Error("This video could not be read."));
+    reader.readAsDataURL(file);
+  });
+  return { data, mimeType, alt: "" };
+}
+
+/** A length in seconds as m:ss. */
+export function clock(seconds: number): string {
+  const whole = Math.ceil(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+/** Base64 bytes back into a Blob, in slices, so a large video never needs one huge binary string. */
+export function base64ToBlob(data: string, mimeType: string): Blob {
+  const parts: Uint8Array<ArrayBuffer>[] = [];
+  const step = 4 * 1024 * 1024;
+  for (let offset = 0; offset < data.length; offset += step) {
+    const chunk = atob(data.slice(offset, offset + step));
+    const bytes = new Uint8Array(chunk.length);
+    for (let index = 0; index < chunk.length; index += 1) bytes[index] = chunk.charCodeAt(index);
+    parts.push(bytes);
+  }
+  return new Blob(parts, { type: mimeType });
+}
+
 export interface LocalDraft {
   requestId: string;
   // Set when the composer edits a draft or scheduled post saved in Postslop.
@@ -63,10 +112,12 @@ export interface LocalDraft {
   text: string;
   platforms: Platform[];
   images: NewImage[];
+  // Never together with images.
+  video?: NewVideo;
   scheduledAt: string;
 }
 
-// The unsent draft lives in this browser, images included, until it is published.
+// The unsent draft lives in this browser, images and video included, until it is published.
 const database = new Promise<IDBDatabase>((resolve, reject) => {
   const request = indexedDB.open("postslop", 1);
   request.onupgradeneeded = () => request.result.createObjectStore("drafts");
@@ -75,13 +126,29 @@ const database = new Promise<IDBDatabase>((resolve, reject) => {
 });
 database.catch(() => {});
 
-export async function loadDraft(): Promise<LocalDraft | undefined> {
-  const db = await database;
+// A video's bytes are kept under their own key and written only when the video changes, so typing never
+// rewrites them; the draft itself keeps the video's type and description.
+type StoredDraft = Omit<LocalDraft, "video"> & { video?: Omit<NewVideo, "data"> };
+let storedVideoData: string | undefined;
+
+function read<T>(db: IDBDatabase, key: string): Promise<T | undefined> {
   return new Promise((resolve, reject) => {
-    const request = db.transaction("drafts").objectStore("drafts").get("current");
+    const request = db.transaction("drafts").objectStore("drafts").get(key);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+export async function loadDraft(): Promise<LocalDraft | undefined> {
+  const db = await database;
+  const stored = await read<StoredDraft>(db, "current");
+  if (!stored) return undefined;
+  const { video, ...draft } = stored;
+  if (!video) return draft;
+  const data = await read<string>(db, "current-video");
+  if (typeof data !== "string" || data === "") return draft;
+  storedVideoData = data;
+  return { ...draft, video: { ...video, data } };
 }
 
 let chain = Promise.resolve();
@@ -92,9 +159,21 @@ export function saveDraft(draft: LocalDraft | null): Promise<void> {
       const db = await database;
       await new Promise<void>((resolve, reject) => {
         const transaction = db.transaction("drafts", "readwrite");
-        if (draft) transaction.objectStore("drafts").put(draft, "current");
-        else transaction.objectStore("drafts").delete("current");
-        transaction.oncomplete = () => resolve();
+        const store = transaction.objectStore("drafts");
+        const data = draft?.video?.data;
+        if (draft) {
+          const { video, ...rest } = draft;
+          const stored: StoredDraft = video ? { ...rest, video: { mimeType: video.mimeType, alt: video.alt } } : rest;
+          store.put(stored, "current");
+        } else store.delete("current");
+        if (data !== storedVideoData) {
+          if (data) store.put(data, "current-video");
+          else store.delete("current-video");
+        }
+        transaction.oncomplete = () => {
+          storedVideoData = data;
+          resolve();
+        };
         transaction.onerror = () => reject(new Error("Your draft could not be saved."));
       });
     });

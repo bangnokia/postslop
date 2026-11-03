@@ -22,6 +22,7 @@ A post is one piece of content for one or more destinations. Each destination ha
   "text": "A short post",
   "platforms": ["bluesky", "dev-null", "x"],
   "images": [{"id": "…", "mimeType": "image/jpeg", "width": 1200, "height": 800, "alt": "A useful description"}],
+  "video": null,
   "results": [
     {"platform": "bluesky", "status": "failed", "error": "Refresh this session and try again."},
     {"platform": "dev-null", "status": "unknown", "error": "dev-null.sh did not confirm the post. Check your profile before posting again."},
@@ -50,16 +51,16 @@ Postslop holds one account per site. Sign-in checks are cached per account for 3
 ```json
 {
   "platforms": [
-    {"id": "x", "label": "X", "available": true, "handle": "example", "enabled": true, "connected": true, "importedAt": "2026-10-20T17:29:06Z", "source": "firefox", "maxImages": 4, "textLimit": 280},
-    {"id": "bluesky", "label": "Bluesky", "available": false, "handle": "example.test", "reason": "Turned off in Postslop.", "enabled": false, "connected": true, "importedAt": "2026-10-20T17:29:06Z", "source": "chrome", "maxImages": 4, "textLimit": 300},
-    {"id": "dev-null", "label": "dev-null.sh", "available": false, "handle": null, "reason": "Not connected. Run: postslop setup dev-null", "enabled": true, "connected": false, "importedAt": null, "source": null, "maxImages": 3, "textLimit": 4000}
+    {"id": "x", "label": "X", "available": true, "handle": "example", "enabled": true, "connected": true, "importedAt": "2026-10-20T17:29:06Z", "source": "firefox", "maxImages": 4, "textLimit": 280, "maxVideoSeconds": 140},
+    {"id": "bluesky", "label": "Bluesky", "available": false, "handle": "example.test", "reason": "Turned off in Postslop.", "enabled": false, "connected": true, "importedAt": "2026-10-20T17:29:06Z", "source": "chrome", "maxImages": 4, "textLimit": 300, "maxVideoSeconds": 180},
+    {"id": "dev-null", "label": "dev-null.sh", "available": false, "handle": null, "reason": "Not connected. Run: postslop setup dev-null", "enabled": true, "connected": false, "importedAt": null, "source": null, "maxImages": 3, "textLimit": 4000, "maxVideoSeconds": null}
   ],
-  "limits": {"maxImages": 4, "maxImageBytes": 1048576},
+  "limits": {"maxImages": 4, "maxImageBytes": 1048576, "maxVideoBytes": 20971520},
   "publishingEnabled": true
 }
 ```
 
-Handles have no leading `@`. A platform can be unavailable even when session data exists; show `reason` and let the user pick other destinations. An optional `detail` holds technical information for diagnosing it, such as the background browser's own error, with secrets removed. `textLimit` is for counters; each publisher enforces its site's exact rule.
+Handles have no leading `@`. A platform can be unavailable even when session data exists; show `reason` and let the user pick other destinations. An optional `detail` holds technical information for diagnosing it, such as the background browser's own error, with secrets removed. `textLimit` is for counters; each publisher enforces its site's exact rule. `maxVideoSeconds` is the longest video the site takes from Postslop, or `null` when it takes none.
 
 `connected` says a session is saved. `enabled` is false for an account turned off in Postslop: it keeps its session, is not checked, and a post still addressed to it fails for that site with nothing sent. Offer only accounts that are connected and enabled.
 
@@ -89,9 +90,10 @@ Each of these answers with the accounts, as `GET /api/v1/accounts?refresh=1` doe
 ```
 
 - `requestId`: lowercase UUID, optional (one is made when left out). Reuse it when recovering from a lost response.
-- `text`: UTF-8, at most 3,000 characters; may be empty when images are attached.
+- `text`: UTF-8, at most 3,000 characters; may be empty when images or a video are attached.
 - `platforms`: one to five distinct IDs of `x`, `bluesky`, `dev-null`, `linkedin`, `threads`.
 - `images`: at most four, three with dev-null.sh. Each JPEG, PNG or WebP is at most 1 MiB and 40 megapixels, and its declared type must match its bytes. Alt text is optional, at most 1,000 characters.
+- `video`: one MP4 or MOV video instead of images, as `{"data": "BASE64_VIDEO_BYTES", "mimeType": "video/mp4", "alt": "…"}`, at most 20 MiB; its declared type must match its bytes. X (up to 2:20), Bluesky (up to 3:00) and LinkedIn (0:03 to 10:00) take videos; any other destination, or a video too long or short for one of them, is refused with 422. Posts return it as `video: {id, mimeType, width, height, alt}`, or `null`, and its bytes come from `GET /api/v1/media/{id}`.
 - `mode`: `now` publishes, `draft` saves, `schedule` saves for `scheduledAt` (an ISO 8601 time in the future). Defaults to `schedule` when `scheduledAt` is given, otherwise `now`.
 
 Returns the post. A publication that partly or wholly failed is still a 200: read its results.

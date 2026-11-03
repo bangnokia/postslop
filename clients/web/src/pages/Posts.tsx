@@ -3,7 +3,7 @@ import { api, inFlight, postTime, type Post, type PostStatus } from "../api";
 import { Icon } from "../components/icons";
 import { when } from "../compose";
 import { PageHeader, useShell } from "../shell";
-import { MediaThumb, PlatformIcon, StatusBadge, usePolling, usePostsChanged } from "../ui";
+import { MediaThumb, PlatformIcon, StatusBadge, usePolling, usePostsChanged, VideoTile } from "../ui";
 
 export const FILTERS: { id: string; label: string; statuses: PostStatus[] }[] = [
   { id: "all", label: "All", statuses: [] },
@@ -152,6 +152,11 @@ export function PostCard({ post, onOpen }: { post: Post; onOpen: () => void }) {
           {post.images.slice(0, 4).map((image) => (
             <MediaThumb key={image.id} id={image.id} alt={image.alt} />
           ))}
+        </div>
+      )}
+      {post.video && (
+        <div className="post-card-media" data-count="1">
+          <VideoTile />
         </div>
       )}
       <p className="post-card-text">{post.text || <em className="muted">No text</em>}</p>

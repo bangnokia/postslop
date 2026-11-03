@@ -19,6 +19,8 @@ return [
     'x_bundle_url' => env('POSTSLOP_X_BUNDLE_URL', ''),
     'x_upload_url' => env('POSTSLOP_X_UPLOAD_URL', 'https://upload.x.com'),
     'bluesky_url' => env('POSTSLOP_BLUESKY_URL', ''),
+    // Bluesky's video service, which processes videos before they are posted.
+    'bluesky_video_url' => env('POSTSLOP_BLUESKY_VIDEO_URL', 'https://video.bsky.app'),
     'dev_null_url' => env('POSTSLOP_DEV_NULL_URL', 'https://dev-null.sh'),
     'linkedin_url' => env('POSTSLOP_LINKEDIN_URL', 'https://www.linkedin.com'),
     'threads_url' => env('POSTSLOP_THREADS_URL', 'https://www.threads.com'),

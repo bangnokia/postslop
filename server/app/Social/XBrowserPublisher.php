@@ -9,6 +9,7 @@ namespace App\Social;
 final readonly class XBrowserPublisher implements Publisher
 {
     private XBrowserProcess $worker;
+    private XBrowserProcess $videoWorker;
 
     // Paths are explicit so the worker can only receive Postslop's imported session and dedicated profile.
     // @mago-expect lint:excessive-parameter-list
@@ -21,6 +22,8 @@ final readonly class XBrowserPublisher implements Publisher
         private string $baseUrl = 'https://x.com',
     ) {
         $this->worker = new XBrowserProcess($nodeBinary, $workerPath, $timeoutSeconds);
+        // The worker allows a video 150 seconds and reports eight seconds after; this waits a little longer still.
+        $this->videoWorker = new XBrowserProcess($nodeBinary, $workerPath, max($timeoutSeconds, 165));
     }
 
     public function status(): array
@@ -59,7 +62,7 @@ final readonly class XBrowserPublisher implements Publisher
         }
     }
 
-    public function publish(string $requestId, string $text, array $images): array
+    public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
     {
         if (count($images) > 4) {
             return ['platform' => 'x', 'status' => 'failed', 'error' => 'X allows up to four images per post.'];
@@ -69,17 +72,15 @@ final readonly class XBrowserPublisher implements Publisher
         } catch (\RuntimeException) {
             return ['platform' => 'x', 'status' => 'failed', 'error' => $this->reason('signed_out')];
         }
+        if ($video !== null && $images !== []) {
+            return ['platform' => 'x', 'status' => 'failed', 'error' => 'X takes images or one video, not both.'];
+        }
         try {
-            $result = $this->worker->request([
+            $result = ($video === null ? $this->worker : $this->videoWorker)->request([
                 ...$input,
                 'requestId' => $requestId,
                 'text' => $text,
-                'images' => array_map(static fn(ImageAttachment $image): array => [
-                    'filename' => $image->filename,
-                    'mimeType' => $image->mimeType,
-                    'data' => base64_encode($image->bytes),
-                    'alt' => $image->alt,
-                ], $images),
+                ...self::attachments($images, $video),
             ]);
         } catch (\RuntimeException|\JsonException) {
             return $this->unknown();
@@ -112,6 +113,7 @@ final readonly class XBrowserPublisher implements Publisher
                     'challenge',
                     'busy',
                     'image_failed',
+                    'video_failed',
                     'composer_unavailable',
                     'rejected',
                     'automation_rejected',
@@ -124,6 +126,31 @@ final readonly class XBrowserPublisher implements Publisher
             return ['platform' => 'x', 'status' => 'failed', 'error' => $this->reason($code)];
         }
         return $this->unknown();
+    }
+
+    /**
+     * The attachments as the worker reads them: images with their descriptions, or one video, which X takes without one.
+     *
+     * @param list<ImageAttachment> $images
+     */
+    private static function attachments(array $images, ?VideoAttachment $video): array
+    {
+        $attachments = [
+            'images' => array_map(static fn(ImageAttachment $image): array => [
+                'filename' => $image->filename,
+                'mimeType' => $image->mimeType,
+                'data' => base64_encode($image->bytes),
+                'alt' => $image->alt,
+            ], $images),
+        ];
+        if ($video !== null) {
+            $attachments['video'] = [
+                'filename' => $video->filename,
+                'mimeType' => $video->mimeType,
+                'data' => base64_encode($video->bytes),
+            ];
+        }
+        return $attachments;
     }
 
     private function input(string $operation): array
@@ -154,6 +181,7 @@ final readonly class XBrowserPublisher implements Publisher
             'challenge' => 'X requires an account check before Postslop can publish. No post was submitted.',
             'busy' => 'Postslop is already checking or publishing to X. Try again shortly.',
             'image_failed' => 'X could not finish attaching the image. No post was submitted.',
+            'video_failed' => 'X could not attach or finish processing the video. No post was submitted.',
             'composer_unavailable'
                 => 'X’s composer could not be prepared. Your draft is saved and no post was submitted.',
             'rejected' => 'X rejected this post. Keep the draft and check the account before trying again.',

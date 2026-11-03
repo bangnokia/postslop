@@ -3,7 +3,7 @@ import { api, inFlight, PLATFORM_NAMES, postTime, type Post } from "../api";
 import { Icon } from "../components/icons";
 import { toIso, toLocalInput, when } from "../compose";
 import { useShell } from "../shell";
-import { MediaThumb, postsChanged, Results, StatusBadge, usePolling } from "../ui";
+import { MediaThumb, MediaVideo, postsChanged, Results, StatusBadge, usePolling } from "../ui";
 
 // One post, shown in the drawer over whichever page is open.
 export function PostDetail({ id, onClose }: { id: string; onClose: () => void }) {
@@ -73,6 +73,12 @@ export function PostDetail({ id, onClose }: { id: string; onClose: () => void })
               </figure>
             ))}
           </div>
+        )}
+        {post.video && (
+          <figure className="detail-video">
+            <MediaVideo id={post.video.id} alt={post.video.alt} />
+            {post.video.alt && <figcaption>{post.video.alt}</figcaption>}
+          </figure>
         )}
       </article>
       <section>

@@ -1,6 +1,6 @@
 # Threads
 
-Threads is an experimental destination in the CLI, HTTP API, web composer and Raycast extension. Automated checks use a local fake site. Read-only sign-in has been verified with an imported Chrome session; live publication has not been verified.
+Threads is an experimental destination in the CLI, HTTP API, web composer and Raycast extension. Automated checks use a local fake site. Read-only sign-in has been verified with an imported Chrome session; live publication has not been verified. Threads takes no videos from Postslop: its video upload is undocumented here, needs a cover frame, and its processing step would resend the post.
 
 ## Setup
 

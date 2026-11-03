@@ -22,10 +22,12 @@ import { join } from "node:path";
 import { clientFor, Preferences, ServerStatus } from "./client";
 import {
   Attachment,
+  attachmentsOf,
   cleanPostURL,
   Draft,
   DraftStore,
   fullyPublished,
+  hasContent,
   newDraft,
   Platform,
   platformNames,
@@ -35,6 +37,7 @@ import {
   submissionAction,
 } from "./draft";
 import { importImage } from "./images";
+import { importVideo, isVideoPath } from "./videos";
 import { queueTask, taskIsActive } from "./background";
 
 function message(error: unknown) {
@@ -60,7 +63,10 @@ function SavedPosts({
       {posts.map((post) => (
         <List.Item
           key={post.requestId}
-          title={post.text.trim().split("\n")[0] || "Image post"}
+          title={
+            post.text.trim().split("\n")[0] ||
+            (post.video ? "Video post" : "Image post")
+          }
           subtitle={
             post.result?.status || (post.submitted ? "Unconfirmed" : "Draft")
           }
@@ -157,7 +163,12 @@ export default function Postslop() {
         }
         current.current = saved;
         setDraft(saved);
-        if (!saved.backgroundTask && !saved.text && !saved.images.length) {
+        if (
+          !saved.backgroundTask &&
+          !saved.text &&
+          !saved.images.length &&
+          !saved.video
+        ) {
           setNotice("Published. Ready for your next post.");
           setFormVersion((value) => value + 1);
         }
@@ -176,7 +187,9 @@ export default function Postslop() {
     setDraft(next);
   }
 
-  function edit(patch: Partial<Pick<Draft, "text" | "platforms" | "images">>) {
+  function edit(
+    patch: Partial<Pick<Draft, "text" | "platforms" | "images" | "video">>,
+  ) {
     if (!current.current || current.current.submitted) return;
     const next = { ...current.current, ...patch };
     try {
@@ -247,12 +260,12 @@ export default function Postslop() {
         );
       }
       commit({ ...current.current!, images: [...retained, ...imported] });
-      store.current!.removeImages(
+      store.current!.removeAttachments(
         previous.images.filter((image) => !paths.includes(image.path)),
       );
       setNotice("Images attached and saved on this Mac.");
     } catch (error) {
-      store.current!.removeImages(
+      store.current!.removeAttachments(
         imported.filter(
           (image) =>
             !current.current?.images.some((item) => item.path === image.path),
@@ -262,6 +275,57 @@ export default function Postslop() {
       await showToast({
         style: Toast.Style.Failure,
         title: "Could Not Attach Image",
+        message: message(error),
+      });
+    } finally {
+      busyRef.current = false;
+      setBusy(undefined);
+    }
+  }
+
+  // The picker's paths: images, or one video on its own.
+  async function changeAttachments(paths: (string | undefined)[]) {
+    const previous = current.current;
+    if (!previous || previous.submitted || busyRef.current) return;
+    const videos = paths.filter((path): path is string =>
+      Boolean(path && isVideoPath(path)),
+    );
+    const imagePaths = paths.filter((path) => !path || !isVideoPath(path));
+    if (videos.length > 1 || (videos.length === 1 && imagePaths.length)) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Images or One Video",
+        message: "A post takes up to four images or one video, not both.",
+      });
+      return;
+    }
+    if (!videos.length) {
+      if (previous.video) {
+        commit({ ...previous, video: undefined });
+        store.current!.removeAttachments([previous.video]);
+      }
+      return changeImages(imagePaths);
+    }
+    if (videos[0] === previous.video?.path) return;
+    busyRef.current = true;
+    setBusy("Preparing video…");
+    let imported: Attachment | undefined;
+    try {
+      imported = await importVideo(
+        environment.supportPath,
+        videos[0],
+        server?.limits?.maxVideoBytes,
+      );
+      commit({ ...current.current!, images: [], video: imported });
+      store.current!.removeAttachments(attachmentsOf(previous));
+      setNotice("Video attached and saved on this Mac.");
+    } catch (error) {
+      if (imported && current.current?.video?.path !== imported.path)
+        store.current!.removeAttachments([imported]);
+      setNotice(message(error));
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Could Not Attach Video",
         message: message(error),
       });
     } finally {
@@ -286,20 +350,39 @@ export default function Postslop() {
       if (!checking) {
         if (submissionAction(submitted) === "Retry Failed")
           submitted = retryFailed(submitted);
-        if (!submitted.text.trim() && !submitted.images.length)
-          throw new Error("Write something or attach an image first.");
+        if (
+          !submitted.text.trim() &&
+          !submitted.images.length &&
+          !submitted.video
+        )
+          throw new Error(
+            "Write something or attach an image or a video first.",
+          );
         if (!submitted.platforms.length)
           throw new Error("Choose at least one destination.");
         if (submitted.images.length > imageLimit(submitted))
           throw new Error(
             `Selected destinations allow ${imageLimit(submitted)} images.`,
           );
+        if (submitted.video) {
+          const refusing = submitted.platforms.filter(
+            (id) =>
+              server?.platforms.find((item) => item.id === id)
+                ?.maxVideoSeconds === null,
+          );
+          if (refusing.length)
+            throw new Error(
+              `${refusing.map((id) => platformNames[id]).join(", ")} ${refusing.length === 1 ? "takes" : "take"} no videos yet. Remove ${refusing.length === 1 ? "it" : "them"} or the video.`,
+            );
+        }
         if (
           Array.from(submitted.text).length > 3000 ||
-          submitted.images.some((image) => Array.from(image.alt).length > 1000)
+          attachmentsOf(submitted).some(
+            (item) => Array.from(item.alt).length > 1000,
+          )
         )
           throw new Error(
-            "Use up to 3,000 characters of text and 1,000 characters of image description.",
+            "Use up to 3,000 characters of text and 1,000 characters of image or video description.",
           );
       }
       queued = queueTask(
@@ -344,7 +427,7 @@ export default function Postslop() {
     const previous = current.current;
     try {
       commit(newDraft(store.current!.preferredPlatforms()));
-      store.current!.removeImages(previous.images);
+      store.current!.removeAttachments(attachmentsOf(previous));
       setFormVersion((value) => value + 1);
       setNotice("Ready for your next post.");
     } catch {
@@ -356,8 +439,7 @@ export default function Postslop() {
     const previous = current.current;
     if (!previous || busyRef.current || taskIsActive(previous)) return;
     try {
-      if (previous.text || previous.images.length || previous.submitted)
-        store.current!.archive(previous);
+      if (hasContent(previous)) store.current!.archive(previous);
       commit(newDraft(store.current!.preferredPlatforms()));
       setFormVersion((value) => value + 1);
       setNotice("Ready for a new post. Your previous post is in Saved Posts.");
@@ -375,8 +457,7 @@ export default function Postslop() {
           posts={store.current!.savedPosts()}
           onRestore={(saved) => {
             const previous = current.current!;
-            if (previous.text || previous.images.length || previous.submitted)
-              store.current!.archive(previous);
+            if (hasContent(previous)) store.current!.archive(previous);
             commit(saved);
             setFormVersion((value) => value + 1);
             setNotice("Saved post restored.");
@@ -396,6 +477,7 @@ export default function Postslop() {
         ...newDraft(previous.platforms),
         text: previous.text,
         images: previous.images,
+        video: previous.video,
         previouslyPublished: rememberPublished(previous),
       });
       setFormVersion((value) => value + 1);
@@ -452,8 +534,8 @@ export default function Postslop() {
               icon={Icon.Clipboard}
               shortcut={{ modifiers: ["ctrl", "shift"], key: "v" }}
               onAction={() =>
-                changeImages([
-                  ...draft.images.map((image) => image.path),
+                changeAttachments([
+                  ...attachmentsOf(draft).map((item) => item.path),
                   undefined,
                 ])
               }
@@ -516,7 +598,10 @@ export default function Postslop() {
       }
     >
       {locked ? (
-        <Form.Description title="Post" text={draft.text || "Images only"} />
+        <Form.Description
+          title="Post"
+          text={draft.text || (draft.video ? "Video only" : "Images only")}
+        />
       ) : (
         <Form.TextArea
           id="text"
@@ -529,19 +614,19 @@ export default function Postslop() {
       )}
       {!locked && (
         <Form.FilePicker
-          id="images"
-          title="Images"
-          value={draft.images.map((image) => image.path)}
+          id="attachments"
+          title="Attachments"
+          value={attachmentsOf(draft).map((item) => item.path)}
           canChooseDirectories={false}
           allowMultipleSelection
-          onChange={changeImages}
-          info="Choose image files, or paste an image with ⌃⇧V. Remove an attachment using its × button."
+          onChange={changeAttachments}
+          info="Choose up to four images or one MP4 or MOV video (up to 20 MiB), or paste an image with ⌃⇧V. Remove an attachment using its × button."
         />
       )}
       <Form.Description
         text={
           busy ||
-          `${Array.from(draft.text).length} characters · ${draft.images.length}/${imageLimit(draft)} images`
+          `${Array.from(draft.text).length} characters · ${draft.video ? `1 video (${(draft.video.bytes / 1024 / 1024).toFixed(1)} MiB)` : `${draft.images.length}/${imageLimit(draft)} images`}`
         }
       />
       {locked ? (
@@ -560,7 +645,13 @@ export default function Postslop() {
             <Form.TagPicker.Item
               key={id}
               value={id}
-              title={platformNames[id]}
+              title={
+                draft.video &&
+                server?.platforms.find((item) => item.id === id)
+                  ?.maxVideoSeconds === null
+                  ? `${platformNames[id]} (no videos)`
+                  : platformNames[id]
+              }
             />
           ))}
         </Form.TagPicker>
@@ -582,6 +673,15 @@ export default function Postslop() {
             }
           />
         ))}
+      {!locked && draft.video && (
+        <Form.TextField
+          id="video-alt"
+          title="Video Description"
+          placeholder="Optional alt text"
+          value={draft.video.alt}
+          onChange={(alt) => edit({ video: { ...draft.video!, alt } })}
+        />
+      )}
       <Form.Separator />
       <Form.Description
         title="Status"

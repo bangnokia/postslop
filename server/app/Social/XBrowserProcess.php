@@ -11,7 +11,8 @@ use Crab\Engine\EventLoop;
 // @mago-expect lint:cyclomatic-complexity,kan-defect
 final readonly class XBrowserProcess
 {
-    private const MAX_INPUT_BYTES = 7 * 1024 * 1024;
+    // A 20 MiB video travels as about 27 MiB of base64, beside the session and text.
+    private const MAX_INPUT_BYTES = 30 * 1024 * 1024;
     private const MAX_OUTPUT_BYTES = 64 * 1024;
 
     public function __construct(
@@ -19,8 +20,9 @@ final readonly class XBrowserProcess
         private string $workerPath,
         private float $timeoutSeconds = 95,
     ) {
-        if (!is_finite($timeoutSeconds) || $timeoutSeconds <= 0 || $timeoutSeconds > 95) {
-            throw new \InvalidArgumentException('The X browser worker deadline must be between 0 and 95 seconds.');
+        // A video's upload and processing at X take longer; the queue reclaims a job only after 300 seconds.
+        if (!is_finite($timeoutSeconds) || $timeoutSeconds <= 0 || $timeoutSeconds > 170) {
+            throw new \InvalidArgumentException('The X browser worker deadline must be between 0 and 170 seconds.');
         }
     }
 

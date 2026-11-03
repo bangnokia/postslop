@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -12,6 +12,17 @@ import { xFixture } from '../fakes/x-browser.mjs';
 
 process.env.POSTSLOP_TEST_MODE = '1';
 const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aB1cAAAAASUVORK5CYII=', 'base64');
+// A dummy MP4: the worker checks the file signature; X itself would decode the rest.
+const box = (type, payload) => {
+  const header = Buffer.alloc(8);
+  header.writeUInt32BE(8 + payload.length);
+  header.write(type, 4, 'ascii');
+  return Buffer.concat([header, payload]);
+};
+const videoBytes = Buffer.concat([box('ftyp', Buffer.from('isom\0\0\x02\0isomiso2avc1mp41', 'latin1')), box('mdat', Buffer.alloc(64, 7))]);
+const withVideo = (input) => ({
+  ...input, images: [], video: { filename: 'postslop-video.mp4', mimeType: 'video/mp4', data: videoBytes.toString('base64') },
+});
 
 async function withFixture(options, callback) {
   const directory = await mkdtemp(join(tmpdir(), 'postslop-worker-'));
@@ -47,6 +58,52 @@ test('publishes text, clipboard image bytes and alt text through the browser exa
     assert.equal((await stat(join(input.profilePath, 'postslop-session.json'))).mode & 0o777, 0o600);
     const journal = JSON.parse(await readFile(join(input.profilePath, 'postslop-requests', `${input.requestId}.json`), 'utf8'));
     assert.equal(journal.submitted, true);
+  });
+});
+
+test('publishes one video once X has processed it, exactly once', async () => {
+  await withFixture({}, async (input, fixture) => {
+    const request = withVideo(input);
+    const result = await runWorker(request);
+    assert.deepEqual(result, { platform: 'x', status: 'published', url: 'https://x.com/bangnokia/status/100001' });
+    assert.equal(fixture.posts.length, 1);
+    assert.equal(fixture.posts[0].text, input.text);
+    assert.equal(fixture.posts[0].images.length, 1);
+    assert.equal(fixture.posts[0].images[0].mimeType, 'video/mp4');
+    assert.equal(fixture.posts[0].images[0].sha256, createHash('sha256').update(videoBytes).digest('hex'));
+    assert.deepEqual(await runWorker(request), result);
+    assert.equal(fixture.posts.length, 1);
+  });
+});
+
+test('publishes a video of several MiB, whose base64 runs to millions of characters', async () => {
+  await withFixture({}, async (input, fixture) => {
+    const large = Buffer.concat([videoBytes, Buffer.alloc(8 * 1024 * 1024, 9)]);
+    const request = withVideo(input);
+    request.video.data = large.toString('base64');
+    assert.equal((await runWorker(request)).status, 'published');
+    assert.equal(fixture.posts[0].images[0].bytes, large.length);
+    assert.equal(fixture.posts[0].images[0].sha256, createHash('sha256').update(large).digest('hex'));
+  });
+});
+
+test('stops with nothing posted when X never finishes processing a video', async () => {
+  await withFixture({ failure: 'video-stuck' }, async (input, fixture) => {
+    const result = await runWorker(withVideo(input));
+    assert.equal(result.status, 'failed');
+    assert.equal(result.code, 'video_failed');
+    assert.equal(fixture.posts.length, 0);
+    await assert.rejects(stat(join(input.profilePath, 'postslop-requests', `${input.requestId}.json`)), { code: 'ENOENT' });
+  });
+});
+
+test('refuses images beside a video, and a video that is not MP4 or MOV, before opening X', async () => {
+  await withFixture({}, async (input, fixture) => {
+    assert.equal((await runWorker({ ...withVideo(input), images: input.images })).code, 'invalid_request');
+    const notVideo = withVideo(input);
+    notVideo.video.data = Buffer.from('plain text, not a video').toString('base64');
+    assert.equal((await runWorker(notVideo)).code, 'invalid_request');
+    assert.equal(fixture.posts.length, 0);
   });
 });
 

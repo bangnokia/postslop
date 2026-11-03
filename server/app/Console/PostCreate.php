@@ -23,15 +23,16 @@ final readonly class PostCreate extends CliCommand
     {
         return <<<'TEXT'
             Write a post: saved as a draft unless --now or --at says otherwise
-            Usage: postslop post "Text" [--to=x,bluesky,dev-null,linkedin,threads] [--image=a.png,b.png] [--now | --at=TIME]
+            Usage: postslop post "Text" [--to=x,bluesky,dev-null,linkedin,threads] [--image=a.png,b.png | --video=clip.mp4] [--now | --at=TIME]
             Options:
               --to=LIST          Destinations, comma separated (default: every account set up and turned on)
               --image=LIST       JPEG, PNG or WebP files of at most 1 MiB, comma separated
+              --video=FILE       One MP4 or MOV video of at most 20 MiB, instead of images (X, Bluesky, LinkedIn)
               --now              Publish immediately
               --at=TIME          Schedule: "2026-10-21 09:00", "tomorrow 9am" or "+2 hours", local time
               --request-id=UUID  Make the command safe to repeat: the same ID never posts twice
               --input=FILE       Read the whole post as JSON from FILE, or - for standard input:
-                                 {"text", "platforms", "images": [{"path", "alt"}], "scheduledAt"}
+                                 {"text", "platforms", "images": [{"path", "alt"}], "video": {"path", "alt"}, "scheduledAt"}
               --dry-run          Check the post and the accounts without saving or sending anything
               --json             Print the post as JSON
             Text "-" reads the text from standard input.
@@ -89,6 +90,7 @@ final readonly class PostCreate extends CliCommand
         $text = implode(' ', $input->arguments());
         $to = self::value($input, 'to');
         $images = self::value($input, 'image');
+        $video = self::value($input, 'video');
         return [
             'text' => $text === '-' ? rtrim((string) stream_get_contents(STDIN), "\n") : $text,
             'platforms' => $to === null
@@ -97,6 +99,7 @@ final readonly class PostCreate extends CliCommand
             'images' => $images === null
                 ? []
                 : array_map(static fn(string $path): array => ['path' => trim($path)], explode(',', $images)),
+            ...($video === null ? [] : ['video' => ['path' => trim($video)]]),
         ];
     }
 
@@ -119,6 +122,13 @@ final readonly class PostCreate extends CliCommand
             'mode' => $request->mode,
             'platforms' => $request->platforms,
             'images' => count($request->images),
+            'video' => $request->video === null
+                ? null
+                : [
+                    'width' => $request->video->width,
+                    'height' => $request->video->height,
+                    'seconds' => round($request->video->milliseconds / 1000, 1),
+                ],
             'scheduledAt' => $request->scheduledAt?->format('Y-m-d\TH:i:s\Z'),
             'problems' => $problems,
         ];

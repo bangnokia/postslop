@@ -38,7 +38,7 @@ composer build           # build the web client
 composer start
 ```
 
-Open <http://127.0.0.1:8087> and enter your access token. Press <kbd>C</kbd> to write a post, pick the sites and add images, then publish it now, schedule it, or save it as a draft. Scheduled posts go out while Postslop is running; `composer stop` stops it.
+Open <http://127.0.0.1:8087> and enter your access token. Press <kbd>C</kbd> to write a post, pick the sites and add images or a video, then publish it now, schedule it, or save it as a draft. Scheduled posts go out while Postslop is running; `composer stop` stops it.
 
 - **Raycast** (macOS): write and publish without leaving Raycast. Install it with `composer raycast:install` and `composer raycast:dev`. See the [Raycast guide](clients/raycast/README.md).
 - **AI agents**: connect an MCP client to `https://YOUR_SERVER/api/v1/mcp` with your access token. Agents save drafts by default; scheduling and publishing are separate, explicit steps. See [MCP](docs/mcp.md) and the [agent guide](docs/agents.md).

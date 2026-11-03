@@ -42,8 +42,12 @@ final readonly class DevNullPublisher implements Publisher
         }
     }
 
-    public function publish(string $requestId, string $text, array $images): array
+    public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
     {
+        // The site's post form takes text and images only, so a video is refused before any request.
+        if ($video !== null) {
+            return $this->result('failed', 'dev-null.sh cannot take videos from Postslop yet. Nothing was posted.');
+        }
         $submitted = false;
         $session = null;
         try {

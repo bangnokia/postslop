@@ -22,7 +22,7 @@ export function xFixture({ handle = 'bangnokia', failure = null, prefix = '' } =
         ${failure === 'ambiguous-composer' ? '<textarea data-testid="tweetTextarea_0"></textarea>' : ''}
         <div contenteditable="true" role="textbox" aria-label="Post text" data-testid="tweetTextarea_0" style="min-height:60px; white-space:pre-wrap"></div>
         <div id="placeholder">What's happening?</div>
-        <input type="file" accept="image/*" multiple hidden>
+        <input type="file" accept="image/*,video/mp4,video/quicktime" multiple hidden>
         <div data-testid="attachments" hidden></div>
         <a href="${prefix}/compose/post/media" id="description" hidden>Add description</a>
         <div id="editor" role="dialog" hidden>
@@ -40,9 +40,16 @@ export function xFixture({ handle = 'bangnokia', failure = null, prefix = '' } =
           const editor = document.querySelector('#editor');
           const alt = document.querySelector('#alt');
           function edit(index) { activeImage = index; alt.value = alts[index] || ''; editor.hidden = false; }
+          const postButton = composer.querySelector('[data-testid="tweetButton"]');
           composer.querySelector('input').onchange = (event) => {
             files = Array.from(event.target.files); attachments.hidden = false;
-            document.querySelector('#description').hidden = false;
+            const video = files.some((file) => file.type.startsWith('video/'));
+            // Like X, a video has no description link, and Post waits until the upload is processed.
+            document.querySelector('#description').hidden = video;
+            if (video) {
+              postButton.disabled = true;
+              if (${JSON.stringify(failure)} !== 'video-stuck') setTimeout(() => { postButton.disabled = false; }, 700);
+            }
             attachments.replaceChildren(...files.map((file, index) => {
               const editButton = document.createElement('button');
               editButton.textContent = 'Edit media'; editButton.onclick = () => edit(index);
@@ -53,10 +60,13 @@ export function xFixture({ handle = 'bangnokia', failure = null, prefix = '' } =
           document.querySelector('#save').onclick = () => { alts[activeImage] = alt.value; editor.hidden = true; };
           composer.querySelector('[data-testid="tweetButton"]').onclick = async () => {
             const text = composer.querySelector('[data-testid="tweetTextarea_0"]').innerText;
-            const images = await Promise.all(files.map(async (file, index) => ({
-              filename: file.name, mimeType: file.type, bytes: file.size,
-              data: Array.from(new Uint8Array(await file.arrayBuffer())), alt: alts[index] || ''
-            })));
+            // A video is recorded by its checksum; spelling out millions of bytes would only slow the fake down.
+            const hex = (buffer) => Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, '0')).join('');
+            const images = await Promise.all(files.map(async (file, index) => file.type.startsWith('video/')
+              ? { filename: file.name, mimeType: file.type, bytes: file.size, alt: '',
+                  sha256: hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())) }
+              : { filename: file.name, mimeType: file.type, bytes: file.size,
+                  data: Array.from(new Uint8Array(await file.arrayBuffer())), alt: alts[index] || '' }));
             const variables = {
               tweet_text: ${JSON.stringify(failure)} === 'mismatched-text' ? 'Unexpected text' : text,
               media: { media_entities: ${JSON.stringify(failure)} === 'mismatched-media' ? [] : images.map((_, index) => ({ media_id: String(index + 1), tagged_users: [] })) }
@@ -98,7 +108,9 @@ export function xFixture({ handle = 'bangnokia', failure = null, prefix = '' } =
       }
       response.end(JSON.stringify({ data: { create_tweet: { tweet_results: { result: {
         rest_id: String(100000 + posts.length),
-        legacy: { full_text: posts.at(-1).text, extended_entities: { media: posts.at(-1).images.map((image) => ({ type: 'photo', ext_alt_text: image.alt })) } },
+        legacy: { full_text: posts.at(-1).text, extended_entities: { media: posts.at(-1).images.map((image) => image.mimeType.startsWith('video/')
+          ? { type: 'video' }
+          : { type: 'photo', ext_alt_text: image.alt }) } },
         core: { user_results: { result: { legacy: { screen_name: handle } } } },
       } } } } }));
       return;

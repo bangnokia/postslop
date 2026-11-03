@@ -54,7 +54,9 @@
             "@php server/tests/mcp.php",
             "@php server/tests/accounts.php",
             "@php server/tests/x-rejections.php",
-            "@php server/tests/threads.php"
+            "@php server/tests/threads.php",
+            "@php server/tests/bluesky.php",
+            "@php server/tests/linkedin.php"
         ],
         "test:browser": [
             "@php server/tests/browser-publisher.php",

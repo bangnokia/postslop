@@ -20,7 +20,8 @@ return [
     'watch' => ['app', 'app.php', 'config', 'routes', 'public', '.env'],
 
     // The largest request body taken, in bytes, and how many seconds a client has to send one. Raise both for uploads.
-    'max_body' => 7 * 1024 * 1024,
+    // A 20 MiB video arrives as about 27 MiB of base64 inside the post's JSON.
+    'max_body' => 28 * 1024 * 1024,
     'body_timeout' => 30,
 
     // Seconds to finish in-flight requests on stop or reload; connections still open at the limit are cut.

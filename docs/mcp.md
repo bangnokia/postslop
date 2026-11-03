@@ -24,7 +24,7 @@ Start the server with `composer start`. Set `APP_URL` to its public URL, such as
 | `postslop_check_account` | Refresh one account's sign-in status |
 | `postslop_list_posts` | Saved posts, filtered by statuses, with pagination |
 | `postslop_get_post` | A post and each destination's result |
-| `postslop_create_draft` | Save text, destinations and optional images; never publishes |
+| `postslop_create_draft` | Save text, destinations and optional images or one video; never publishes |
 | `postslop_update_draft` | Replace editable content and return it to draft, clearing its schedule |
 | `postslop_schedule_post` | Schedule/reschedule a post, or pass `scheduledAt: null` to unschedule |
 | `postslop_publish_post` | Queue an existing post for immediate publishing |
@@ -56,7 +56,7 @@ Scheduling requires the server's scheduler and queue workers to remain running. 
 
 Publishing answers immediately with queued deliveries. Poll `postslop_get_post` every few seconds until the post is no longer `publishing`, then report each delivery's URL or error. Never retry an `unknown` result or create a replacement: it may already be live. MCP does not expose retries, deletion, browser session imports, or account credentials.
 
-Images use `images: [{"data": "<base64 bytes>", "mimeType": "image/png", "alt": "Description"}]`; JPEG, PNG and WebP are accepted, up to 1 MiB each and the destinations' image limit. Local paths and remote image URLs are not accepted. Updating a draft requires the complete text, platforms and images; `images: []` removes attachments. Read the existing post first. Updating a scheduled post clears its schedule.
+Images use `images: [{"data": "<base64 bytes>", "mimeType": "image/png", "alt": "Description"}]`; JPEG, PNG and WebP are accepted, up to 1 MiB each and the destinations' image limit. Local paths and remote image URLs are not accepted. Updating a draft requires the complete text, platforms and images; `images: []` removes attachments. Read the existing post first. Updating a scheduled post clears its schedule. Instead of images, a post may carry one video: `video: {"data": "<base64 bytes>", "mimeType": "video/mp4", "alt": "Description"}`, an MP4 or MOV of at most 20 MiB, only for destinations whose `maxVideoSeconds` in `postslop_accounts` is set (X, Bluesky and LinkedIn); omit `video` when updating to remove it.
 
 ## Protocol
 

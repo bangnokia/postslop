@@ -78,8 +78,13 @@ final readonly class ThreadsPublisher implements Publisher
         }
     }
 
-    public function publish(string $requestId, string $text, array $images): array
+    public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
     {
+        // Threads' web video path (rupload_igvideo, a cover frame, transcoding before configure) is neither documented
+        // in the protocol reference nor verified, so a video is refused before any request instead of guessed at.
+        if ($video !== null) {
+            return $this->result('failed', 'Threads cannot take videos from Postslop yet. Nothing was posted.');
+        }
         $submitted = false;
         try {
             if (preg_match_all('/\X/u', $text) > Platforms::TEXT_LIMITS['threads']) {

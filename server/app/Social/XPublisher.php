@@ -37,8 +37,16 @@ final class XPublisher implements Publisher
         }
     }
 
-    public function publish(string $requestId, string $text, array $images): array
+    public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
     {
+        // Videos go through X's own composer, which processes them before posting.
+        if ($video !== null) {
+            return [
+                'platform' => 'x',
+                'status' => 'failed',
+                'error' => 'Posting a video to X needs POSTSLOP_X_TRANSPORT=browser. Nothing was posted.',
+            ];
+        }
         $submitted = false;
         try {
             if (count($images) > 4) {

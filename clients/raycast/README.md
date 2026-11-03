@@ -23,7 +23,7 @@ This compiles a small background image helper and installs the extension in Rayc
 
 Raycast's supported form controls determine the textarea size and keyboard behavior. Clipboard images use **⌃⇧V**; ordinary text paste remains **⌘V**. The retained web composer includes image thumbnails.
 
-The extension supports four images, or three when dev-null.sh is selected. The background helper resizes images to JPEG locally, each no larger than 1 MiB. Transparent backgrounds become white. It reads the pasteboard only when Paste Image is invoked and does not monitor clipboard history.
+The extension supports four images, or three when dev-null.sh is selected, or instead one MP4 or MOV video of at most 20 MiB for X, Bluesky and LinkedIn, which is sent unchanged. The background helper resizes images to JPEG locally, each no larger than 1 MiB. Transparent backgrounds become white. It reads the pasteboard only when Paste Image is invoked and does not monitor clipboard history.
 
 ## Results and recovery
 

@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 use App\PrivateFiles;
 use App\Social\ImageAttachment;
+use App\Social\VideoAttachment;
 use App\Social\SessionStore;
 use App\Social\XBrowserPublisher;
 use Crab\Engine\EventLoop;
@@ -53,6 +54,10 @@ file_put_contents($workerPath, <<<'JS'
         filename: image.filename, mimeType: image.mimeType, alt: image.alt,
         sha256: createHash('sha256').update(Buffer.from(image.data, 'base64')).digest('hex'),
       })),
+      video: input.video ? {
+        filename: input.video.filename, mimeType: input.video.mimeType,
+        sha256: createHash('sha256').update(Buffer.from(input.video.data, 'base64')).digest('hex'),
+      } : null,
     }));
     if (scenario.mode === 'hang' || scenario.mode === 'ignore-term') {
       writeFileSync(new URL('./pid', import.meta.url), String(process.pid));
@@ -151,6 +156,32 @@ try {
     );
     browser_check(!file_exists($directory . '/should-not-exist'), 'Post text was interpreted as shell code.');
 
+    // A video crosses to the worker whole, without images, through the worker with the longer deadline.
+    $clipBytes = "\0\0\0\x18ftypisom" . str_repeat("\x07video", 200_000);
+    $clip = new VideoAttachment('postslop-video.mp4', 'video/mp4', $clipBytes, 'Not sent to X', 1280, 720, 4000);
+    PrivateFiles::json($scenarioPath, ['result' => $published]);
+    browser_check($publisher->publish($requestId, $text, [], $clip) === $published, 'A video post confirmation was lost.');
+    $received = json_decode(file_get_contents($directory . '/received.json'), true);
+    browser_check(
+        $received['images'] === []
+        && $received['video'] === [
+            'filename' => 'postslop-video.mp4',
+            'mimeType' => 'video/mp4',
+            'sha256' => hash('sha256', $clipBytes),
+        ],
+        'The video changed across the child-process boundary.',
+    );
+    browser_check(
+        $publisher->publish($requestId, $text, [$image], $clip)['status'] === 'failed',
+        'Images beside a video reached the worker.',
+    );
+    PrivateFiles::json($scenarioPath, ['result' => ['platform' => 'x', 'status' => 'failed', 'code' => 'video_failed']]);
+    $stuck = $publisher->publish($requestId, $text, [], $clip);
+    browser_check(
+        $stuck['status'] === 'failed' && str_contains($stuck['error'], 'processing the video'),
+        'A video X could not process was not reported as failed with nothing posted.',
+    );
+
     foreach ([
         'https://x.com/someone_else/status/123',
         'https://x.com/tester/status/123?utm_source=fixture',
@@ -247,7 +278,7 @@ try {
     );
     browser_check($loop->getIdentifiers() === [], 'The process bridge retained event-loop watchers.');
     echo
-        "X browser bridge checks passed: identity, image/text transport, responsive event loop, bounded output, safe errors, uncertain outcomes, and process cleanup.\n";
+        "X browser bridge checks passed: identity, image/video/text transport, responsive event loop, bounded output, safe errors, uncertain outcomes, and process cleanup.\n";
 } finally {
     $files = glob($directory . '/*');
     foreach ($files === false ? [] : $files as $path) {

@@ -6,6 +6,8 @@ import type { Draft, Platform, PostResult } from "./draft";
 
 export interface ServerStatus {
   publishingEnabled: boolean;
+  // Older servers leave out the video limit.
+  limits?: { maxImages?: number; maxVideoBytes?: number };
   platforms: {
     id: Platform;
     label: string;
@@ -16,6 +18,8 @@ export interface ServerStatus {
     handle?: string;
     reason?: string;
     maxImages?: number;
+    // The longest video this site takes, in seconds; null when it takes no videos.
+    maxVideoSeconds?: number | null;
   }[];
 }
 
@@ -130,6 +134,9 @@ export class PostslopClient implements Postslop {
           path: image.path,
           alt: image.alt,
         })),
+        ...(draft.video
+          ? { video: { path: draft.video.path, alt: draft.video.alt } }
+          : {}),
       }),
     );
   }
@@ -154,6 +161,7 @@ export class ApiClient implements Postslop {
     method: string,
     path: string,
     body?: unknown,
+    timeout = 60_000,
   ): Promise<T> {
     let response: Response;
     try {
@@ -165,7 +173,7 @@ export class ApiClient implements Postslop {
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         },
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(timeout),
       });
     } catch {
       throw new Error(
@@ -196,14 +204,26 @@ export class ApiClient implements Postslop {
         alt: image.alt,
       })),
     );
+    const video = draft.video && {
+      data: (await readFile(draft.video.path)).toString("base64"),
+      mimeType: draft.video.mimeType,
+      alt: draft.video.alt,
+    };
     // Repeating the request ID returns the post already made; it is never sent twice.
-    const post = await this.call<Post>("POST", "/posts", {
-      requestId: draft.requestId,
-      text: draft.text,
-      platforms: draft.platforms,
-      images,
-      mode: "now",
-    });
+    const post = await this.call<Post>(
+      "POST",
+      "/posts",
+      {
+        requestId: draft.requestId,
+        text: draft.text,
+        platforms: draft.platforms,
+        images,
+        ...(video ? { video } : {}),
+        mode: "now",
+      },
+      // A video can take a while to upload to a remote Postslop.
+      video ? 300_000 : 60_000,
+    );
     return result(await this.settled(post));
   }
 

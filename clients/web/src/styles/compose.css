@@ -74,6 +74,21 @@
   object-fit: cover;
 }
 
+.attachments .attachment-video {
+  grid-column: 1 / -1;
+  max-width: 360px;
+}
+
+.attachments video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #000000;
+  object-fit: contain;
+}
+
 .attachments .input {
   height: 30px;
   font-size: var(--text-xs);
@@ -305,6 +320,14 @@
   width: 100%;
   aspect-ratio: 16 / 10;
   object-fit: cover;
+}
+
+.preview-media video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: #000000;
+  object-fit: contain;
 }
 
 /* Actions */

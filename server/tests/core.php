@@ -7,6 +7,7 @@ require __DIR__ . '/support.php';
 use App\Core\Failure;
 use App\Core\PostRequest;
 use App\Social\Publisher;
+use App\Social\VideoAttachment;
 use Crab\Contracts\Database\Database;
 
 // An assertion evaluates a boolean condition rather than selecting a behavior.
@@ -16,6 +17,24 @@ function check(bool $condition, string $message): void
     if (!$condition) {
         throw new RuntimeException($message);
     }
+}
+
+/**
+ * A dummy MP4: just the boxes App\Core\VideoFile reads (ftyp, mvhd, and a video track's tkhd and hdlr).
+ */
+function core_test_mp4(int $width, int $height, int $milliseconds, bool $quarterTurn = false): string
+{
+    $box = static fn(string $type, string $payload): string => pack('N', 8 + strlen($payload)) . $type . $payload;
+    $matrix = $quarterTurn
+        ? pack('N9', 0, 0x10000, 0, 0xFFFF0000, 0, 0, 0, 0, 0x40000000)
+        : pack('N9', 0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000);
+    $mvhd = $box('mvhd', "\0\0\0\0" . pack('N4', 0, 0, 1000, $milliseconds) . str_repeat("\0", 80));
+    $tkhd = $box('tkhd', "\0\0\0\x03" . pack('N5', 0, 0, 1, 0, $milliseconds) . str_repeat("\0", 16) . $matrix
+        . pack('N2', $width << 16, $height << 16));
+    $hdlr = $box('hdlr', str_repeat("\0", 8) . 'vide' . str_repeat("\0", 12) . "VideoHandler\0");
+    return $box('ftyp', 'isom' . pack('N', 512) . 'isomiso2avc1mp41')
+        . $box('moov', $mvhd . $box('trak', $tkhd . $box('mdia', $hdlr)))
+        . $box('mdat', str_repeat("\x07", 256));
 }
 
 function refused(callable $action, string $kind): void
@@ -39,7 +58,7 @@ $publisher = new class implements Publisher {
         return ['id' => 'x', 'label' => 'X', 'available' => true, 'handle' => '@fixture'];
     }
 
-    public function publish(string $requestId, string $text, array $images): array
+    public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
     {
         $this->calls++;
         if ($this->uncertain) {
@@ -189,7 +208,7 @@ try {
             return ['id' => 'bluesky', 'label' => 'Bluesky', 'available' => true];
         }
 
-        public function publish(string $requestId, string $text, array $images): array
+        public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
         {
             $deliveries = $this->db->table('deliveries')->where('post_id', $requestId)->orderBy('position')->get();
             check(
@@ -255,11 +274,119 @@ try {
     check(count($page['posts']) === 2 && $page['next'] !== null, 'History did not page');
     check(count($publishing->list(['scheduled'])['posts']) === 0, 'History did not filter by status');
 
+    // Videos: one per post and never beside images, only to sites that take them, within every site's length.
+    $videoPublisher = new class implements Publisher {
+        public int $calls = 0;
+        public ?VideoAttachment $video = null;
+        public array $images = [];
+
+        public function status(): array
+        {
+            return ['id' => 'x', 'label' => 'X', 'available' => true, 'handle' => '@fixture'];
+        }
+
+        public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
+        {
+            $this->calls++;
+            $this->video = $video;
+            $this->images = $images;
+            return ['platform' => 'x', 'status' => 'published', 'url' => 'https://x.com/fixture/status/456'];
+        }
+    };
+    $videos = test_publishing($app, ['x' => $videoPublisher], $directory);
+    $clip = core_test_mp4(640, 360, 3000);
+    $videoPost = [
+        'requestId' => '00000000-0000-4000-8000-0000000000a1',
+        'text' => 'A dummy clip',
+        'platforms' => ['x'],
+        'video' => ['data' => base64_encode($clip), 'mimeType' => 'video/mp4', 'alt' => 'Dummy clip'],
+    ];
+    $sent = $videos->create(PostRequest::fromApi($videoPost));
+    check(
+        $sent['status'] === 'published'
+            && $videoPublisher->video?->bytes === $clip
+            && $videoPublisher->video->mimeType === 'video/mp4'
+            && $videoPublisher->video->filename === 'postslop-video.mp4'
+            && $videoPublisher->video->alt === 'Dummy clip'
+            && [$videoPublisher->video->width, $videoPublisher->video->height, $videoPublisher->video->milliseconds]
+                === [640, 360, 3000]
+            && $videoPublisher->images === [],
+        'The publisher did not receive the stored video',
+    );
+    check(
+        $sent['images'] === []
+            && is_string($sent['video']['id'] ?? null)
+            && array_diff_key($sent['video'], ['id' => true])
+                === ['mimeType' => 'video/mp4', 'width' => 640, 'height' => 360, 'alt' => 'Dummy clip'],
+        'A post did not present its video apart from its images',
+    );
+    check($videos->media($sent['video']['id'])['mimeType'] === 'video/mp4', 'The video could not be served');
+    check(
+        $videos->create(PostRequest::fromApi($videoPost)) === $sent && $videoPublisher->calls === 1,
+        'Repeating a video post sent it twice',
+    );
+    refused(
+        fn() => $videos->create(PostRequest::fromApi([...$videoPost, 'video' => [...$videoPost['video'], 'alt' => 'Changed']])),
+        Failure::CONFLICT,
+    );
+    check(
+        PostRequest::fromCli([
+            ...$videoPost,
+            'video' => ['path' => (static function () use ($directory): string {
+                file_put_contents($directory . '/clip.mp4', core_test_mp4(1280, 720, 5000, true));
+                return $directory . '/clip.mp4';
+            })()],
+        ])->video?->width === 720,
+        'A video turned a quarter must report its shown size',
+    );
+    check(
+        PostRequest::fromApi($payload)->fingerprint === hash('sha256', json_encode(['fixture', ['x'], []], JSON_THROW_ON_ERROR)),
+        'Posts without a video must keep the fingerprint they were saved with',
+    );
+    $badVideos = [
+        'beside images' => [...$videoPost, 'images' => [['data' => base64_encode($bytes), 'alt' => '']]],
+        'to a site without videos' => [...$videoPost, 'platforms' => ['x', 'dev-null']],
+        'too long for X' => [...$videoPost, 'video' => ['data' => base64_encode(core_test_mp4(640, 360, 150_000))]],
+        'a mismatched type' => [...$videoPost, 'video' => [...$videoPost['video'], 'mimeType' => 'video/quicktime']],
+        'an image as video' => [...$videoPost, 'video' => ['data' => base64_encode($bytes)]],
+        'no video track' => [...$videoPost, 'video' => ['data' => base64_encode(substr($clip, 0, 32))]],
+        'oversized data' => [...$videoPost, 'video' => ['data' => str_repeat('A', 27_962_032)]],
+        'not an object' => [...$videoPost, 'video' => 'clip.mp4'],
+    ];
+    foreach ($badVideos as $case => $bad) {
+        refused(fn() => PostRequest::fromApi($bad), Failure::INVALID);
+        check($case !== '', 'Unnamed video case');
+    }
+    try {
+        PostRequest::fromApi($badVideos['to a site without videos']);
+    } catch (Failure $refusal) {
+        check(str_contains($refusal->getMessage(), 'dev-null.sh'), 'A refused video must name the sites that take none');
+    }
+    $draft = $videos->create(PostRequest::fromApi([
+        ...$videoPost,
+        'requestId' => '00000000-0000-4000-8000-0000000000a2',
+        'mode' => 'draft',
+    ]));
+    $videoFile = $directory . '/media/' . $draft['video']['id'] . '.mp4';
+    check(is_file($videoFile), 'A draft video was not stored');
+    $edited = $videos->update($draft['id'], PostRequest::fromApi([
+        'requestId' => $draft['id'],
+        'text' => 'Now without the clip',
+        'platforms' => ['x'],
+        'mode' => 'draft',
+    ]));
+    check($edited['video'] === null && !is_file($videoFile), 'Removing a video in an edit left it behind');
+    $x = array_column($videos->accounts()['platforms'], null, 'id')['x'];
+    check(
+        $x['maxVideoSeconds'] === 140 && $videos->accounts()['limits']['maxVideoBytes'] === PostRequest::MAX_VIDEO_BYTES,
+        'Accounts must say which sites take videos and how long',
+    );
+
     foreach (glob($directory . '/media/*') as $file) {
         check((fileperms($file) & 0o777) === 0o600, 'Stored images are not private');
     }
     echo
-        "Core checks passed: repeat/uncertain submission protection, crash recovery, per-site locking, drafts, scheduling, failed-only retries, input validation, and private media.\n";
+        "Core checks passed: repeat/uncertain submission protection, crash recovery, per-site locking, drafts, scheduling, failed-only retries, input validation, videos, and private media.\n";
 } finally {
     test_remove($directory);
 }

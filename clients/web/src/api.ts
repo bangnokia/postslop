@@ -39,11 +39,13 @@ export interface Account {
   source?: string | null;
   maxImages: number;
   textLimit: number;
+  // The longest video this site takes, in seconds; null when it takes no videos. Older servers leave it out.
+  maxVideoSeconds?: number | null;
 }
 
 export interface Accounts {
   platforms: Account[];
-  limits: { maxImages: number; maxImageBytes: number };
+  limits: { maxImages: number; maxImageBytes: number; maxVideoBytes?: number };
   publishingEnabled: boolean;
 }
 
@@ -63,12 +65,23 @@ export interface StoredImage {
   alt: string;
 }
 
+// A post carries images or one video, never both.
+export interface StoredVideo {
+  id: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  alt: string;
+}
+
 export interface Post {
   id: string;
   status: PostStatus;
   text: string;
   platforms: Platform[];
   images: StoredImage[];
+  // Older servers leave this out.
+  video?: StoredVideo | null;
   results: Result[];
   scheduledAt: string | null;
   publishedAt: string | null;
@@ -82,11 +95,19 @@ export interface NewImage {
   alt: string;
 }
 
+// The video's bytes as base64, unchanged: the browser never recompresses a video.
+export interface NewVideo {
+  data: string;
+  mimeType: string;
+  alt: string;
+}
+
 export interface PostInput {
   requestId?: string;
   text: string;
   platforms: Platform[];
   images: NewImage[];
+  video?: NewVideo;
   mode: "now" | "draft" | "schedule";
   scheduledAt?: string;
 }

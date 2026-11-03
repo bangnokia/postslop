@@ -162,7 +162,8 @@ export function StatusBadge({ status }: { status: PostStatus }) {
   return <span className={`badge badge-${status}`}>{STATUS_LABELS[status]}</span>;
 }
 
-export function MediaThumb({ id, alt }: { id: string; alt: string }) {
+// Media needs the token, so it is fetched into an object URL that lives as long as the component.
+function useMediaUrl(id: string): string | undefined {
   const [src, setSrc] = useState<string>();
   useEffect(() => {
     let url: string | undefined;
@@ -179,7 +180,27 @@ export function MediaThumb({ id, alt }: { id: string; alt: string }) {
       if (url) URL.revokeObjectURL(url);
     };
   }, [id]);
+  return src;
+}
+
+export function MediaThumb({ id, alt }: { id: string; alt: string }) {
+  const src = useMediaUrl(id);
   return src ? <img className="thumb" src={src} alt={alt || "Attached image"} /> : <span className="thumb-loading" />;
+}
+
+export function MediaVideo({ id, alt }: { id: string; alt: string }) {
+  const src = useMediaUrl(id);
+  return src ? <video className="thumb" src={src} controls muted playsInline preload="metadata" aria-label={alt || "Attached video"} /> : <span className="thumb-loading" />;
+}
+
+// A card shows that a post has a video without downloading it; the post itself plays it.
+export function VideoTile({ label = "Video" }: { label?: string }) {
+  return (
+    <span className="video-tile">
+      <Icon name="play" size={20} />
+      {label}
+    </span>
+  );
 }
 
 export function Results({ results }: { results: Result[] }) {

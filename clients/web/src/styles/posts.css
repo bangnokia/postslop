@@ -159,6 +159,19 @@
   border-radius: var(--radius-sm);
 }
 
+.detail-video {
+  margin: var(--space-4) 0 0;
+}
+
+.detail-video .thumb,
+.detail-video .thumb-loading {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  background: #000000;
+  object-fit: contain;
+}
+
+.detail-video figcaption,
 .detail-images figcaption {
   margin-top: var(--space-1);
   color: var(--text-3);
