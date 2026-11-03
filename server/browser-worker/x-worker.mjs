@@ -233,8 +233,10 @@ function postResult(body, handle, input) {
     if (input.attachments.some((attachment, index) => attachment.alt && media[index].ext_alt_text !== attachment.alt)) return null;
     if (input.attachments.some((attachment, index) => attachment.video && !['video', 'animated_gif'].includes(media[index]?.type))) return null;
   }
-  // X appends media URLs and expands URLs in its response, so only compare exact plain text.
-  if (!/https?:\/\//i.test(input.text)) {
+  // X appends media URLs and shortens links in its response, bare domains such as github.com/… included; a post
+  // with a link X reports is not compared as plain text. The request guard already matched the text sent.
+  const links = tweet?.legacy?.entities?.urls;
+  if (!/https?:\/\//i.test(input.text) && !(Array.isArray(links) && links.length)) {
     const expected = input.text.replace(/\r\n/g, '\n').trim();
     const actual = fullText.replace(/(?:^|\s+)https:\/\/t\.co\/\S+$/, '').trim();
     if (actual !== expected) return null;
@@ -263,7 +265,13 @@ async function publish(page, input, handle, markSubmitted, diagnostic) {
   await composer.press('Backspace');
   const lines = input.text.split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
-    if (index) await composer.press('Shift+Enter');
+    if (index) {
+      await composer.press('Shift+Enter');
+      // After a line break X's editor can lose its caret: a character inserted directly, as Playwright enters an
+      // emoji or symbol, then lands at the end of the post. Stepping back and forth puts the caret right again.
+      await composer.press('ArrowLeft');
+      await composer.press('ArrowRight');
+    }
     await composer.pressSequentially(lines[index]);
   }
   if (input.text.trim()) await composerDialog.getByText(/^What['’]s happening\?$/)

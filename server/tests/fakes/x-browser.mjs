@@ -106,9 +106,15 @@ export function xFixture({ handle = 'bangnokia', failure = null, prefix = '' } =
         response.end(JSON.stringify({ errors: [{ code: 131, message: 'Test server error' }] }));
         return;
       }
+      // Like X, links become t.co addresses, bare domains included, and are listed as URL entities.
+      const links = [];
+      const shortened = posts.at(-1).text.replace(/\b(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/gi, (link) => {
+        links.push({ url: `https://t.co/fixture${links.length}`, display_url: link.replace(/^https?:\/\//, ''), expanded_url: link });
+        return links.at(-1).url;
+      });
       response.end(JSON.stringify({ data: { create_tweet: { tweet_results: { result: {
         rest_id: String(100000 + posts.length),
-        legacy: { full_text: posts.at(-1).text, extended_entities: { media: posts.at(-1).images.map((image) => image.mimeType.startsWith('video/')
+        legacy: { full_text: shortened, entities: { urls: links }, extended_entities: { media: posts.at(-1).images.map((image) => image.mimeType.startsWith('video/')
           ? { type: 'video' }
           : { type: 'photo', ext_alt_text: image.alt }) } },
         core: { user_results: { result: { legacy: { screen_name: handle } } } },

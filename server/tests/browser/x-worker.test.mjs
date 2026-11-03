@@ -87,6 +87,22 @@ test('publishes a video of several MiB, whose base64 runs to millions of charact
   });
 });
 
+test('keeps emoji and symbols that start a line in place', async () => {
+  await withFixture({}, async (input, fixture) => {
+    const request = { ...input, text: 'Launch 🚀\n\n✅ one\n→ two\n\nthree ✅' };
+    assert.equal((await runWorker(request)).status, 'published');
+    assert.equal(fixture.posts[0].text, request.text);
+  });
+});
+
+test('confirms a post whose bare link X shortened to t.co', async () => {
+  await withFixture({}, async (input, fixture) => {
+    const request = { ...withVideo(input), text: 'Launch day\n\n- one\n- two\n\ngithub.com/bangnokia/postslop' };
+    assert.deepEqual(await runWorker(request), { platform: 'x', status: 'published', url: 'https://x.com/bangnokia/status/100001' });
+    assert.equal(fixture.posts[0].text, request.text);
+  });
+});
+
 test('stops with nothing posted when X never finishes processing a video', async () => {
   await withFixture({ failure: 'video-stuck' }, async (input, fixture) => {
     const result = await runWorker(withVideo(input));
