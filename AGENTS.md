@@ -33,6 +33,7 @@
 - Prefer the smallest change that fixes a proven cause; avoid speculative code.
 - Use the session's native computer-use tool for desktop inspection; do not launch Orca unless explicitly requested.
 - Share clean destination URLs; remove all `utm_*` parameters and do not add campaign tracking parameters.
+- Keep README.md short and user-facing (what Postslop is, install, setup, getting started); put technical details in docs/.
 - Publish scheduled posts through CrabPHP's own schedule and queue run by `start`, never an OS crontab or launchd job.
 - Postslop may be installed on another machine: do not restrict the HTTP API to localhost; protect it with the access token (a password), `POSTSLOP_TOKEN` in `server/.env`, not a file in storage, entered once in the web client; with no token set, the web client and API are public.
 - Keep the web client responsive: publishing now over the HTTP API queues the post and answers at once; the queue workers send it, and the client frees the composer and polls for the result. The CLI's `--now` stays synchronous for agents.

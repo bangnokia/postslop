@@ -251,6 +251,8 @@
 }
 
 .week-body {
+  /* Positioned, so each hour row's offsetTop counts from here when the week scrolls to the working day. */
+  position: relative;
   flex: 1;
   overflow: auto;
 }
