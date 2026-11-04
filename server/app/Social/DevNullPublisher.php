@@ -130,7 +130,14 @@ final readonly class DevNullPublisher implements Publisher
                 !$verified->ok()
                 || !is_array($commit)
                 || ($commit['id'] ?? null) !== $committed['id']
-                || ($commit['user']['handle'] ?? $commit['user']['username'] ?? null) !== $session['handle']
+                // dev-null.sh names the poster author now; user is how it answered before.
+                || (
+                    $commit['author']['handle']
+                    ?? $commit['author']['username']
+                    ?? $commit['user']['handle']
+                    ?? $commit['user']['username']
+                    ?? null
+                ) !== $session['handle']
                 || ($commit['body'] ?? null) !== ($committed['body'] ?? null)
                 || !is_array($commit['images'] ?? null)
                 || count($commit['images']) !== count($images)

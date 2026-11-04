@@ -53,7 +53,8 @@ module.exports = async (req, res) => {
     const count = Object.keys(form).filter(key => /^images\[\d+\]$/.test(key)).length;
     const images = Array.from({ length: count }, (_, i) => ({ id: 'img-' + i, description: form['image_descriptions[' + i + ']'] || form.image_descriptions?.[i] || '' }));
     const id = '00000000-0000-4000-8000-' + String(posts.length + 1).padStart(12, '0');
-    posts.push({ id, body: form.body, user: scenario === 'wrong-author' ? { handle: 'someone_else' } : identity, images, status: 'pending' });
+    // dev-null.sh names the poster author, with its type.
+    posts.push({ id, body: form.body, author: { type: 'user', ...(scenario === 'wrong-author' ? { handle: 'someone_else' } : identity) }, images, status: 'pending' });
     await state.set('dev-null.posts', posts);
     return send(res, 303, '', { Location: '/settings/profile' });
   }
