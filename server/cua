@@ -5,24 +5,5 @@ declare(strict_types=1);
 
 require __DIR__ . '/vendor/autoload.php';
 
-try {
-    $app = require __DIR__ . '/app.php';
-} catch (Throwable $error) {
-    fwrite(
-        STDERR,
-        '[Crab] '
-        . $error->getMessage()
-        . ' ('
-        . $error->getFile()
-        . ':'
-        . $error->getLine()
-        . ")\n"
-        . "The application could not load; this command did not contact the running server.\n"
-        . "Restore the last working application files, or use the previous release with the same shared storage, then retry.\n",
-    );
-    exit(1);
-}
-
-$arguments = array_slice($argv, 1);
-$status = $app->console->run($arguments);
-exit($status);
+// Without a loadable app.php, `status` and `stop` still reach a server in the background.
+exit(Crab\Cua::run(__DIR__ . '/app.php', array_slice($argv, 1)));

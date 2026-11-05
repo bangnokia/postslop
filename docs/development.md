@@ -43,7 +43,7 @@ composer stop                 # gracefully stop the background server
 composer dev                  # restart on file changes; Ctrl+C stops it
 ```
 
-These use `server/.env`. The schedule and queues start when `SERVER_SCHEDULE` and `SERVER_QUEUE` are enabled. `dev` watches files and restarts automatically; `start` never watches, including in the foreground, and refuses `--watch` and `--no-watch`. Use `composer reload` to load production changes. `stop`, `reload` and `restart` manage the background server; stop a foreground server with Ctrl+C. `server:status` lists foreground and background servers, queue workers and schedulers, with per-worker requests, jobs and runs. It exits with 0 when any server is running, or 1 when none is. Composer's built-in `status` command is unrelated, hence `server:status`.
+These use `server/.env`. The schedule and queues always start beside HTTP, because `server/app.php` lists CrabPHP's `QueuePlugin` and `SchedulePlugin`. `dev` watches files and restarts automatically; `start` never watches, including in the foreground, and refuses `--watch` and `--no-watch`. Use `composer reload` to load production changes. `stop`, `reload` and `restart` manage the background server; stop a foreground server with Ctrl+C. `server:status` lists foreground and background servers, queue workers and schedulers, with per-worker requests, jobs and runs. It exits with 0 when any server is running, or 1 when none is. Composer's built-in `status` command is unrelated, hence `server:status`.
 
 `reload` and `restart` preserve the `--address` and `--workers` overrides supplied at startup. Pass new values after `--` when you want to change them. Settings without explicit overrides continue to follow `server/.env` and configuration.
 
@@ -82,7 +82,7 @@ Remote account imports use `POSTSLOP_REMOTE_TOKEN` or an explicit `--token=TOKEN
 
 ## Scheduling
 
-`postslop start` runs CrabPHP's schedule and queue beside the web server when `SERVER_SCHEDULE` and `SERVER_QUEUE` are on in `.env`; no OS cron or launchd job is involved. Every minute the schedule pushes a `PublishDuePosts` job onto the queue (the `jobs` table), which hands each due post's destinations to the sites' own queues. Each site, `x`, `bluesky`, `dev-null`, `linkedin` and `threads`, has its own queue and worker (`config/queue.php`) and its own lock (`storage/publishing-x.lock` and so on), so one post goes to every site at the same time while a site never gets two posts at once. A repeated or retried job is harmless because the core never publishes a delivery twice. `php cua schedule:list` shows the task and `php cua queue:failed` shows jobs that gave up. `postslop run-due` still publishes due posts by hand.
+`postslop start` runs CrabPHP's schedule and queue beside the web server, as `server/app.php` lists their plugins; no OS cron or launchd job is involved. Every minute the schedule pushes a `PublishDuePosts` job onto the queue (the `jobs` table), which hands each due post's destinations to the sites' own queues. Each site, `x`, `bluesky`, `dev-null`, `linkedin` and `threads`, has its own queue and worker (`config/queue.php`) and its own lock (`storage/publishing-x.lock` and so on), so one post goes to every site at the same time while a site never gets two posts at once. A repeated or retried job is harmless because the core never publishes a delivery twice. `php cua schedule:list` shows the task and `php cua queue:failed` shows jobs that gave up. `postslop run-due` still publishes due posts by hand.
 
 ## Never twice
 

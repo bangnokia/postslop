@@ -8,14 +8,6 @@ return [
     // Worker processes. More than one needs PHP's pcntl and posix extensions.
     'workers' => env('SERVER_WORKERS', 1),
 
-    // Servers `start` and `dev` run beside HTTP, each switched on from .env. Off while you develop, when you
-    // start `queue:work` or `schedule:work` only as you need them; on in production, where one command
-    // and one reload then cover everything.
-    'with' => [
-        'queue' => env('SERVER_QUEUE', false),
-        'schedule' => env('SERVER_SCHEDULE', false),
-    ],
-
     // What `php cua dev` watches to restart the server when you save. `start` never watches.
     'watch' => ['app', 'app.php', 'config', 'routes', 'public', '.env'],
 

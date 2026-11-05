@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Providers;
+namespace App;
 
-use App\AccessToken;
 use App\Core\Publishing;
 use App\Jobs\PublishDuePosts;
 use App\Social\BlueskyPublisher;
@@ -18,14 +17,14 @@ use Crab\Contracts\Cache\Cache;
 use Crab\Contracts\Container\Container;
 use Crab\Contracts\Database\Database;
 use Crab\Contracts\HttpClient\Client;
-use Crab\Contracts\Provider;
+use Crab\Contracts\Plugin;
 use Crab\Contracts\Queue\Queue;
 use Crab\Contracts\Schedule\Schedule;
 
 /**
  * Where the application's own services are bound.
  */
-final class AppProvider implements Provider
+final class Setup implements Plugin
 {
     public function register(Container $container): void
     {
@@ -68,7 +67,7 @@ final class AppProvider implements Provider
                 ['x' => config('postslop.x_browser_profile')],
             );
         });
-        // `start` runs the schedule and the queue when SERVER_SCHEDULE and SERVER_QUEUE are on.
+        // `start` runs the schedule and the queue beside HTTP, as app.php lists their plugins.
         $container->get(Schedule::class)->job(PublishDuePosts::class);
     }
 }

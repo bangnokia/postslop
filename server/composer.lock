@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7764009241c182d7d93642d3937798d8",
+    "content-hash": "58ae62e446929a4a1f7b485011686758",
     "packages": [
         {
             "name": "crabphp/framework",
-            "version": "v0.1.0",
+            "version": "v0.6.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/crabphp/framework.git",
-                "reference": "4cd9dd5a72c9ea65f22b31d64ff4f81ebdf31b97"
+                "reference": "243207dab17160b4e12e27f34cea34bcc39c0b1f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/crabphp/framework/zipball/4cd9dd5a72c9ea65f22b31d64ff4f81ebdf31b97",
-                "reference": "4cd9dd5a72c9ea65f22b31d64ff4f81ebdf31b97",
+                "url": "https://api.github.com/repos/crabphp/framework/zipball/243207dab17160b4e12e27f34cea34bcc39c0b1f",
+                "reference": "243207dab17160b4e12e27f34cea34bcc39c0b1f",
                 "shasum": ""
             },
             "require": {
@@ -43,6 +43,7 @@
                 "phpunit/phpunit": "^13.4"
             },
             "suggest": {
+                "ext-fileinfo": "The MediaType rule, which reads an uploaded file's kind from its content",
                 "ext-pcntl": "Supervised parallel workers and Unix signals",
                 "ext-posix": "Supervised worker termination and lifecycle control"
             },
@@ -50,48 +51,21 @@
                 "bin/crab"
             ],
             "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "0.6.x-dev"
+                }
+            },
             "autoload": {
-                "psr-4": {
-                    "Crab\\": "src/"
-                },
                 "files": [
                     "src/Config/helpers.php",
                     "src/helpers.php"
-                ]
-            },
-            "autoload-dev": {
+                ],
                 "psr-4": {
-                    "Crab\\Engine\\Tests\\": "tests/Engine/",
-                    "Crab\\Tests\\": "tests/"
+                    "Crab\\": "src/"
                 }
             },
-            "scripts": {
-                "test": [
-                    "@php vendor/bin/phpunit"
-                ],
-                "test:linux": [
-                    "tests/linux/run.sh"
-                ],
-                "soak": [
-                    "python3 benchmarks/soak.py"
-                ],
-                "docs": [
-                    "Composer\\Config::disableProcessTimeout",
-                    "@php .claude/skills/sync-docs/scripts/serve.php"
-                ],
-                "docs:check": [
-                    "@php .claude/skills/sync-docs/scripts/check.php"
-                ],
-                "format": [
-                    "@php vendor/bin/mago fmt"
-                ],
-                "format:check": [
-                    "@php vendor/bin/mago fmt --check"
-                ],
-                "lint": [
-                    "@php vendor/bin/mago lint"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -103,10 +77,10 @@
             ],
             "description": "A minimal PHP 8.4 web framework on the Crab networking engine",
             "support": {
-                "source": "https://github.com/crabphp/framework/tree/v0.1.0",
-                "issues": "https://github.com/crabphp/framework/issues"
+                "issues": "https://github.com/crabphp/framework/issues",
+                "source": "https://github.com/crabphp/framework/tree/v0.6.1"
             },
-            "time": "2026-10-24T11:10:10+00:00"
+            "time": "2026-11-05T18:12:14+00:00"
         },
         {
             "name": "psr/clock",

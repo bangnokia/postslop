@@ -9,7 +9,7 @@ return [
             'driver' => env('DB_DRIVER', 'sqlite'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', 3306),
-            'database' => env('DB_DATABASE', dirname(__DIR__) . '/storage/database.sqlite'),
+            'database' => env('DB_DATABASE', storage_path('database.sqlite')),
             'username' => env('DB_USERNAME'),
             'password' => env('DB_PASSWORD'),
 

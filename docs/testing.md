@@ -40,7 +40,6 @@ POSTSLOP_BLUESKY_VIDEO_URL=http://127.0.0.1:4900/bluesky \
 POSTSLOP_DEV_NULL_URL=http://127.0.0.1:4900/dev-null \
 POSTSLOP_LINKEDIN_URL=http://127.0.0.1:4900/linkedin \
 POSTSLOP_THREADS_URL=http://127.0.0.1:4900/threads \
-SERVER_QUEUE=true SERVER_SCHEDULE=true \
 CACHE_STORE=array APP_URL=http://127.0.0.1:8091 SERVER_ADDRESS=tcp://127.0.0.1:8091 \
 sh -c 'php cua migrate && php cua start'
 ```
