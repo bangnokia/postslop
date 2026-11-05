@@ -61,11 +61,11 @@ abstract readonly class CliCommand implements Command
 
     protected static function value(Input $input, string $name): ?string
     {
-        $value = $input->option($name);
-        if ($value === true) {
-            throw Failure::invalid('--' . $name . ' needs a value; write --' . $name . '=…');
+        try {
+            return $input->value($name);
+        } catch (\InvalidArgumentException $error) {
+            throw Failure::invalid($error->getMessage());
         }
-        return $value === null || $value === false ? null : $value;
     }
 
     protected static function id(Input $input): string

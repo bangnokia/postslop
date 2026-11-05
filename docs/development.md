@@ -27,7 +27,7 @@ One core holds every rule: drafts, scheduling, history, and never posting the sa
 
 ## Requirements and dependencies
 
-The server and full local CLI require PHP 8.4+ with `fileinfo` and `gd`, Composer and Node 22+ (for the web build and X browser worker). Postslop runs on [CrabPHP](https://github.com/crabphp/framework). Composer installs CrabPHP's stable `0.1.x` releases through the GitHub VCS repository, pinned by `server/composer.lock`; CrabPHP is not on Packagist.
+The server and full local CLI require PHP 8.4+ with `fileinfo` and `gd`, Composer and Node 22+ (for the web build and X browser worker). Postslop runs on [CrabPHP](https://github.com/crabphp/framework) 0.6.1. Composer installs the Packagist release pinned by `server/composer.lock`.
 
 Run the commands from the repository root. The root Composer file provides shortcuts; PHP dependencies and their lockfile remain in `server/`. `composer deps` installs the locked server, web and browser-worker dependencies. `composer setup` creates `server/.env` if it is missing, and prepares private storage and the database. Set `POSTSLOP_TOKEN` in `server/.env` before exposing the server. `composer browser:setup` installs X's private headless browser, `composer build` builds the web client into `server/public`, and `composer accounts:import` imports your signed-in sessions from Chrome. Raycast is optional: `composer raycast:install` installs its dependencies, and `composer raycast:build` builds it on macOS.
 
@@ -49,7 +49,7 @@ These use `server/.env`. The schedule and queues always start beside HTTP, becau
 
 ## Settings and database
 
-Run `composer cua -- describe` to inspect the application, or `composer cua -- describe app` to check settings after editing configuration. Invalid settings, including unknown keys in framework sections, prevent startup, reload and queue workers. The SQLite database defaults to `server/storage/database.sqlite`; `DB_DATABASE` changes its path, and an existing `DB_DSN` still overrides the connection. The default connection's migrations live in `server/database/migrations`.
+Run `composer cua -- describe` to inspect the application, or `composer cua -- describe app` to check settings after editing configuration. Invalid settings, including unknown keys in framework sections, prevent startup, reload and queue workers. The SQLite database defaults to `server/storage/database.sqlite`; `DB_DATABASE` changes its path. The legacy `DB_DSN` override remains supported for existing installations. The default connection's migrations live in `server/database/migrations`.
 
 ## Composer shortcuts
 

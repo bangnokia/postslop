@@ -10,7 +10,7 @@ assert.equal(url.hostname, "127.0.0.1", "Only local fake sites are allowed");
 const storage = `${server}/storage`;
 
 export const fixtureEnv = {
-  DB_DSN: `sqlite:${storage}/test-raycast-database.sqlite`,
+  DB_DATABASE: `${storage}/test-raycast-database.sqlite`,
   CACHE_STORE: "array",
   POSTSLOP_SESSIONS_FILE: `${storage}/test-sessions.json`,
   POSTSLOP_LOCK_FILE: `${storage}/test-raycast-publishing.lock`,

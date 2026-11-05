@@ -19,7 +19,7 @@ use Crab\Contracts\Queue\Queue;
 function test_app(string $directory): App
 {
     PrivateFiles::directory($directory);
-    putenv('DB_DSN=sqlite:' . $directory . '/database.sqlite');
+    putenv('DB_DATABASE=' . $directory . '/database.sqlite');
     putenv('CACHE_STORE=array');
     putenv('POSTSLOP_LOCK_FILE=' . $directory . '/publishing.lock');
     putenv('POSTSLOP_MEDIA_PATH=' . $directory . '/media');
