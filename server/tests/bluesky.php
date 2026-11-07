@@ -200,8 +200,53 @@ try {
         $core->create($request) === $post && count($stats()['uploads']) === 1,
         'Repeating the request uploaded or posted twice',
     );
+
+    // The fake takes image blobs of at most 2,000,000 bytes, as app.bsky.embed.images does, so a larger image fails
+    // when sent as it is, and the core shrinks it to a JPEG that fits while a small image goes byte for byte.
+    $large = test_noise_png(1000, 1000);
+    bluesky_check(
+        strlen($large) > 2_000_000 && strlen($large) <= PostRequest::MAX_IMAGE_BYTES,
+        'The large fixture is mis-sized',
+    );
+    $dot = imagecreatetruecolor(8, 8);
+    ob_start();
+    imagepng($dot);
+    $small = ob_get_clean();
+    $reset();
+    $tooLarge = new App\Social\ImageAttachment('postslop-1.png', 'image/png', $large, '', 1000, 1000);
+    bluesky_check(
+        $publisher->publish(PostRequest::uuid(), 'Too large', [$tooLarge])['status'] === 'failed'
+        && $stats()['posts'] === [],
+        'The fake took an image over Bluesky\'s limit',
+    );
+    $reset();
+    $post = $core->create(PostRequest::fromApi([
+        'text' => 'Core images',
+        'platforms' => ['bluesky'],
+        'images' => [
+            ['data' => base64_encode($large), 'mimeType' => 'image/png', 'alt' => 'Noise'],
+            ['data' => base64_encode($small), 'mimeType' => 'image/png', 'alt' => 'Dot'],
+        ],
+    ]));
+    $sent = $stats();
+    $embedded = $sent['posts'][0]['record']['embed']['images'] ?? [];
+    bluesky_check(
+        $post['status'] === 'published'
+        && $sent['blobs'][0]['mimeType'] === 'image/jpeg'
+        && $sent['blobs'][0]['size'] <= 2_000_000
+        && $embedded[0]['alt'] === 'Noise'
+        && $embedded[0]['aspectRatio']['width'] === $embedded[0]['aspectRatio']['height']
+        && $embedded[0]['aspectRatio']['width'] <= 1000,
+        'The core did not shrink an image to Bluesky\'s limit: ' . json_encode([$post['results'], $sent['blobs']]),
+    );
+    bluesky_check(
+        $sent['blobs'][1]['mimeType'] === 'image/png'
+        && $sent['blobs'][1]['sha256'] === hash('sha256', $small)
+        && $embedded[1]['aspectRatio'] === ['width' => 8, 'height' => 8],
+        'An image within Bluesky\'s limit was changed',
+    );
     echo
-        "Bluesky checks passed: video service authorization, upload, processing waits, embeds with alt text and aspect ratio, repeat uploads, safe failures, and the core path.\n";
+        "Bluesky checks passed: video service authorization, upload, processing waits, embeds with alt text and aspect ratio, repeat uploads, safe failures, images shrunk to the site's limit, and the core path.\n";
 } finally {
     proc_terminate($fake);
     foreach ($pipes as $pipe) {

@@ -37,7 +37,7 @@ module.exports = async (req, res) => {
     const command = url.searchParams.get('command');
     const id = url.searchParams.get('media_id');
     if (req.method === 'POST' && command === 'INIT') {
-      if (url.searchParams.get('media_category') !== 'tweet_image' || Number(url.searchParams.get('total_bytes')) < 1) return send(res, 400, { error: 'Invalid media declaration' });
+      if (url.searchParams.get('media_category') !== 'tweet_image' || Number(url.searchParams.get('total_bytes')) < 1 || Number(url.searchParams.get('total_bytes')) > 5000000) return send(res, 400, { error: 'Invalid media declaration' });
       const next = String(1000 + Object.keys(media).length);
       media[next] = { mimeType: url.searchParams.get('media_type'), bytes: Number(url.searchParams.get('total_bytes')), appended: false, finalized: false };
       await state.set('x.media', media);

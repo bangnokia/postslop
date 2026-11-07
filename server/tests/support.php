@@ -88,3 +88,19 @@ function test_remove(string $path): void
         unlink($path);
     }
 }
+
+/**
+ * A PNG of random pixels, which neither PNG nor JPEG can compress much, so its size is predictable.
+ */
+function test_noise_png(int $width, int $height): string
+{
+    $image = imagecreatetruecolor($width, $height);
+    for ($y = 0; $y < $height; $y++) {
+        for ($x = 0; $x < $width; $x++) {
+            imagesetpixel($image, $x, $y, random_int(0, 0xFFFFFF));
+        }
+    }
+    ob_start();
+    imagepng($image);
+    return (string) ob_get_clean();
+}

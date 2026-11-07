@@ -61,7 +61,7 @@ module.exports = async (req, res) => {
     const params = JSON.parse(req.headers['x-instagram-rupload-params'] || '{}');
     const id = params.upload_id;
     if (params.is_threads !== '1' || params.media_type !== 1 || !params.upload_media_height || !params.upload_media_width
-      || !['image/png', 'image/jpeg', 'image/webp'].includes(req.headers['content-type']) || !bytes.length
+      || !['image/png', 'image/jpeg', 'image/webp'].includes(req.headers['content-type']) || !bytes.length || bytes.length > 8000000
       || req.headers['x-entity-length'] !== String(bytes.length) || req.headers.offset !== '0'
       || req.headers['x-entity-name'] !== `fb_uploader_${id}` || path !== `/rupload_igphoto/fb_uploader_${id}`) {
       return send(res, 422, { status: 'fail' });

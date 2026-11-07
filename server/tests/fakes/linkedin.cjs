@@ -30,6 +30,7 @@ module.exports = async (req, res) => {
     const id = String(uploads.size + 1);
     const base = `http://${req.headers.host}/linkedin/dms-uploads/${id}`;
     if (input.mediaUploadType === 'IMAGE_SHARING') {
+      if (input.fileSize > 5000000) return send(res, 400, { message: 'Image too large' });
       uploads.set(id, { urn: 'urn:li:digitalmediaAsset:fixture' + id, filename: input.filename, kind: 'image', bytes: 0, complete: false });
       return send(res, 200, { data: { value: { urn: 'urn:li:digitalmediaAsset:fixture' + id, singleUploadUrl: base, singleUploadHeaders: { 'media-type-family': 'STILLIMAGE' }, type: 'SINGLE' } } });
     }

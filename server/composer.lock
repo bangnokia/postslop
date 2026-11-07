@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "58ae62e446929a4a1f7b485011686758",
+    "content-hash": "9872c04e019fadd8a8bc37b38ee9dbc5",
     "packages": [
         {
             "name": "crabphp/framework",
@@ -754,7 +754,9 @@
         "php": "^8.4",
         "ext-openssl": "*",
         "ext-pdo_sqlite": "*",
-        "ext-iconv": "*"
+        "ext-iconv": "*",
+        "ext-gd": "*",
+        "ext-exif": "*"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"

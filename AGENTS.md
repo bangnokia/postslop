@@ -40,4 +40,5 @@
 - Give every site its own queue, worker and lock, so one post is sent to all its sites at the same time while each site gets one post at a time.
 - Keep root Composer shortcuts for server lifecycle, setup, CLI/account commands, client builds and checks, so routine work does not require changing into server/.
 - Distribute the remote account client as the MIT-licensed Composer package `bangnokia/postslop`, runnable with `cpx` without cloning or pulling the repository. Reuse the browser import code; account rules and all publishing stay in the server core. Never keep client credentials inside cpx's package cache.
+- Callers, including AI agents, send images as they are and never compress them; the core shrinks an image to each site's own limits when it sends the post, and passes images within them through unchanged.
 - Record durable user conventions here when they are missing and follow them immediately.

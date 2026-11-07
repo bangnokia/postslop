@@ -382,11 +382,76 @@ try {
         'Accounts must say which sites take videos and how long',
     );
 
+    // Images are taken as they are, above 1 MiB, and shrunk only for a site whose limits they exceed.
+    $large = test_noise_png(700, 700);
+    check(strlen($large) > 1_048_576 && strlen($large) <= PostRequest::MAX_IMAGE_BYTES, 'The large fixture is mis-sized');
+    $largePost = [...$payload, 'images' => [['data' => base64_encode($large), 'mimeType' => 'image/png', 'alt' => 'Noise']]];
+    check(PostRequest::fromApi($largePost)->images[0]->bytes === $large, 'An image over 1 MiB was refused or changed');
+    refused(fn() => PostRequest::fromApi([
+        ...$payload,
+        'images' => [['data' => str_repeat('A', 6_990_512), 'alt' => '']],
+    ]), Failure::INVALID);
+    $wide = imagecreatetruecolor(6500, 10);
+    imagealphablending($wide, false);
+    imagesavealpha($wide, true);
+    imagefill($wide, 0, 0, imagecolorallocatealpha($wide, 0, 0, 0, 127));
+    ob_start();
+    imagepng($wide);
+    $widePng = ob_get_clean();
+    $devNull = new class implements Publisher {
+        public array $images = [];
+
+        public function status(): array
+        {
+            return ['id' => 'dev-null', 'label' => 'dev-null.sh', 'available' => true, 'handle' => 'fixture'];
+        }
+
+        public function publish(string $requestId, string $text, array $images, ?VideoAttachment $video = null): array
+        {
+            $this->images = $images;
+            return ['platform' => 'dev-null', 'status' => 'published', 'url' => 'https://dev-null.sh/fixture'];
+        }
+    };
+    $fitting = test_publishing($app, ['dev-null' => $devNull, 'x' => $videoPublisher], $directory);
+    $fitted = $fitting->create(PostRequest::fromApi([
+        ...$payload,
+        'requestId' => '00000000-0000-4000-8000-0000000000b1',
+        'platforms' => ['dev-null', 'x'],
+        'images' => [
+            ['data' => base64_encode($widePng), 'mimeType' => 'image/png', 'alt' => 'Wide'],
+            ['data' => base64_encode($bytes), 'mimeType' => 'image/png', 'alt' => 'Small'],
+        ],
+    ]));
+    [$shrunk, $kept] = $devNull->images;
+    $pixel = imagecolorsforindex($decoded = imagecreatefromstring($shrunk->bytes), imagecolorat($decoded, 0, 0));
+    check(
+        $fitted['status'] === 'published'
+            && $shrunk->mimeType === 'image/jpeg'
+            && $shrunk->filename === 'postslop-1.jpg'
+            && [$shrunk->width, $shrunk->height] === [6000, 9]
+            && [imagesx($decoded), imagesy($decoded)] === [6000, 9]
+            && $shrunk->alt === 'Wide'
+            && $pixel['red'] > 250 && $pixel['green'] > 250 && $pixel['blue'] > 250,
+        'An image wider than dev-null.sh takes was not shrunk to a white-backed JPEG of its size',
+    );
+    check(
+        $kept->bytes === $bytes && $kept->mimeType === 'image/png' && $videoPublisher->images[0]->bytes === $widePng,
+        'An image within a site\'s limits was changed',
+    );
+
+    // An unused video field with empty data is no video, even beside images.
+    $placeholder = ['data' => '', 'mimeType' => 'video/mp4', 'alt' => ''];
+    check(PostRequest::fromApi([...$payload, 'images' => [], 'video' => $placeholder])->video === null, 'An empty video was kept');
+    check(
+        count(PostRequest::fromApi([...$payload, 'images' => [$attachment], 'video' => $placeholder])->images) === 1,
+        'An empty video was refused beside images',
+    );
+
     foreach (glob($directory . '/media/*') as $file) {
         check((fileperms($file) & 0o777) === 0o600, 'Stored images are not private');
     }
     echo
-        "Core checks passed: repeat/uncertain submission protection, crash recovery, per-site locking, drafts, scheduling, failed-only retries, input validation, videos, and private media.\n";
+        "Core checks passed: repeat/uncertain submission protection, crash recovery, per-site locking, drafts, scheduling, failed-only retries, input validation, images fitted to each site, videos, and private media.\n";
 } finally {
     test_remove($directory);
 }

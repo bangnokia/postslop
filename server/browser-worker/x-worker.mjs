@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 process.umask(0o077);
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const maximumImageBytes = 1024 * 1024;
+// X's own limit for an image; Postslop shrinks larger ones to fit before they reach the worker.
+const maximumImageBytes = 5 * 1000 * 1000;
 const maximumVideoBytes = 20 * 1024 * 1024;
 // A 20 MiB video arrives as about 27 MiB of base64, beside the session and text.
 const maximumInputBytes = 30 * 1024 * 1024;
@@ -106,12 +107,13 @@ function validateInput(input) {
   const attachments = images.map((image) => {
     if (!image || typeof image.filename !== 'string' || image.filename.length < 1 || image.filename.length > 200
       || /[\0\/\\]/.test(image.filename) || !allowedImageTypes.has(image.mimeType)
-      || typeof image.data !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(image.data)
+      // The same linear check as videos: a grouped pattern overflows the regex stack on a 5 MB image.
+      || typeof image.data !== 'string' || image.data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(image.data)
       || typeof (image.alt ?? '') !== 'string' || (image.alt ?? '').length > 1000) {
       throw new WorkerError('An attached X image or its alt text is invalid.');
     }
     const buffer = Buffer.from(image.data, 'base64');
-    if (buffer.length === 0 || buffer.length > maximumImageBytes) throw new WorkerError('Each X image must be between 1 byte and 1 MiB.');
+    if (buffer.length === 0 || buffer.length > maximumImageBytes) throw new WorkerError('Each X image must be between 1 byte and 5 MB.');
     const signatureMatches = image.mimeType === 'image/png'
       ? buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
       : image.mimeType === 'image/jpeg'

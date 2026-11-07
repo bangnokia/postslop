@@ -55,7 +55,7 @@ Postslop holds one account per site. Sign-in checks are cached per account for 3
     {"id": "bluesky", "label": "Bluesky", "available": false, "handle": "example.test", "reason": "Turned off in Postslop.", "enabled": false, "connected": true, "importedAt": "2026-10-20T17:29:06Z", "source": "chrome", "maxImages": 4, "textLimit": 300, "maxVideoSeconds": 180},
     {"id": "dev-null", "label": "dev-null.sh", "available": false, "handle": null, "reason": "Not connected. Run: postslop setup dev-null", "enabled": true, "connected": false, "importedAt": null, "source": null, "maxImages": 3, "textLimit": 4000, "maxVideoSeconds": null}
   ],
-  "limits": {"maxImages": 4, "maxImageBytes": 1048576, "maxVideoBytes": 20971520},
+  "limits": {"maxImages": 4, "maxImageBytes": 5242880, "maxVideoBytes": 20971520},
   "publishingEnabled": true
 }
 ```
@@ -92,7 +92,15 @@ Each of these answers with the accounts, as `GET /api/v1/accounts?refresh=1` doe
 - `requestId`: lowercase UUID, optional (one is made when left out). Reuse it when recovering from a lost response.
 - `text`: UTF-8, at most 3,000 characters; may be empty when images or a video are attached.
 - `platforms`: one to five distinct IDs of `x`, `bluesky`, `dev-null`, `linkedin`, `threads`.
-- `images`: at most four, three with dev-null.sh. Each JPEG, PNG or WebP is at most 1 MiB and 40 megapixels, and its declared type must match its bytes. Alt text is optional, at most 1,000 characters.
+- `images`: at most four, three with dev-null.sh. Each JPEG, PNG or WebP is at most 5 MiB and 40 megapixels, and its declared type must match its bytes. Alt text is optional, at most 1,000 characters. Send images as they are: when a post is sent, Postslop shrinks an image that exceeds a site's own limit to a JPEG that fits that site (transparent backgrounds become white) and sends every other image unchanged. The stored post keeps the original. The limits, in `server/app/Core/Platforms.php`:
+
+  | Site | Largest image | Source |
+  | --- | --- | --- |
+  | X | 5 MB | [X API media best practices](https://docs.x.com/x-api/media/quickstart/best-practices) |
+  | Bluesky | 2,000,000 bytes | [`app.bsky.embed.images` lexicon](https://github.com/bluesky-social/bsky/blob/main/lexicons/app/bsky/embed/images.json) (`maxSize`, formerly 1 MB) |
+  | dev-null.sh | 10 MiB, 6,000 px on either side | the site's own web composer (10,485,760 bytes); Postslop's dev-null.sh publisher refuses larger sides |
+  | LinkedIn | 5 MB, under 36,152,320 pixels | [Share photos on LinkedIn](https://www.linkedin.com/help/linkedin/answer/a527229), [Images API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/images-api) |
+  | Threads | 8 MB | [Threads API media specifications](https://developers.facebook.com/docs/threads/overview) |
 - `video`: one MP4 or MOV video instead of images, as `{"data": "BASE64_VIDEO_BYTES", "mimeType": "video/mp4", "alt": "…"}`, at most 20 MiB; its declared type must match its bytes. X (up to 2:20), Bluesky (up to 3:00) and LinkedIn (0:03 to 10:00) take videos; any other destination, or a video too long or short for one of them, is refused with 422. Posts return it as `video: {id, mimeType, width, height, alt}`, or `null`, and its bytes come from `GET /api/v1/media/{id}`.
 - `mode`: `now` publishes, `draft` saves, `schedule` saves for `scheduledAt` (an ISO 8601 time in the future). Defaults to `schedule` when `scheduledAt` is given, otherwise `now`.
 

@@ -51,6 +51,8 @@ module.exports = async (req, res) => {
     const form = fields(body, req.headers['content-type']);
     if (typeof form.body !== 'string') return send(res, 422, { error: 'Missing body', fields: Object.keys(form), bodyType: typeof body });
     const count = Object.keys(form).filter(key => /^images\[\d+\]$/.test(key)).length;
+    // The site's composer takes images of at most 10 MiB.
+    if (Array.from({ length: count }, (_, i) => form['images[' + i + ']']).some(image => image.length > 10485760)) return send(res, 422, { error: 'Image too large' });
     const images = Array.from({ length: count }, (_, i) => ({ id: 'img-' + i, description: form['image_descriptions[' + i + ']'] || form.image_descriptions?.[i] || '' }));
     const id = '00000000-0000-4000-8000-' + String(posts.length + 1).padStart(12, '0');
     // dev-null.sh names the poster author, with its type.

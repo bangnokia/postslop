@@ -25,6 +25,16 @@ final class Platforms
         'threads' => 500,
     ];
 
+    // The largest image each site takes: its bytes, and where the site has one, its longest side or its pixel count.
+    // Postslop shrinks a larger image to fit when it is sent (see ImageFit). The sources are in docs/api.md.
+    public const array IMAGE_LIMITS = [
+        'x' => ['bytes' => 5_000_000],
+        'bluesky' => ['bytes' => 2_000_000],
+        'dev-null' => ['bytes' => 10_485_760, 'side' => 6000],
+        'linkedin' => ['bytes' => 5_000_000, 'pixels' => 36_152_319],
+        'threads' => ['bytes' => 8_000_000],
+    ];
+
     // The longest video each site takes from Postslop, in seconds. A site without an entry takes no videos yet.
     public const array VIDEO_SECONDS = [
         'x' => 140,

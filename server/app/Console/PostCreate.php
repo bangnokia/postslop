@@ -26,7 +26,7 @@ final readonly class PostCreate extends CliCommand
             Usage: postslop post "Text" [--to=x,bluesky,dev-null,linkedin,threads] [--image=a.png,b.png | --video=clip.mp4] [--now | --at=TIME]
             Options:
               --to=LIST          Destinations, comma separated (default: every account set up and turned on)
-              --image=LIST       JPEG, PNG or WebP files of at most 1 MiB, comma separated
+              --image=LIST       JPEG, PNG or WebP files of at most 5 MiB, comma separated
               --video=FILE       One MP4 or MOV video of at most 20 MiB, instead of images (X, Bluesky, LinkedIn)
               --now              Publish immediately
               --at=TIME          Schedule: "2026-10-21 09:00", "tomorrow 9am" or "+2 hours", local time

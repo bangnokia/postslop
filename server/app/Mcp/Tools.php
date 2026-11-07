@@ -162,9 +162,9 @@ final readonly class Tools
             'images' => [
                 'type' => 'array',
                 'maxItems' => PostRequest::MAX_IMAGES,
-                'description' => 'JPEG, PNG or WebP, at most 1 MiB each. Send base64 bytes, never paths or URLs. Include alt text.',
+                'description' => 'JPEG, PNG or WebP, at most 5 MiB each, sent as they are: Postslop resizes them for each site. Send base64 bytes, never paths or URLs. Include alt text.',
                 'items' => self::object([
-                    'data' => ['type' => 'string', 'maxLength' => 1_398_104],
+                    'data' => ['type' => 'string', 'maxLength' => 6_990_508],
                     'mimeType' => ['type' => 'string', 'enum' => ['image/jpeg', 'image/png', 'image/webp']],
                     'alt' => ['type' => 'string', 'maxLength' => 1000],
                 ], ['data', 'alt']),

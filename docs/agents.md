@@ -61,7 +61,7 @@ postslop post --input=- --request-id=$ID --json <<'JSON'
 JSON
 ```
 
-Images are JPEG, PNG or WebP, at most 1 MiB each. Always write alt text.
+Images are JPEG, PNG or WebP, at most 5 MiB each. Send them as they are; never resize or compress them first, since Postslop fits each image to every site's own limit when it sends the post. Always write alt text.
 
 ### 4. Read the result
 

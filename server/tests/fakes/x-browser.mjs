@@ -60,10 +60,10 @@ export function xFixture({ handle = 'bangnokia', failure = null, prefix = '' } =
           document.querySelector('#save').onclick = () => { alts[activeImage] = alt.value; editor.hidden = true; };
           composer.querySelector('[data-testid="tweetButton"]').onclick = async () => {
             const text = composer.querySelector('[data-testid="tweetTextarea_0"]').innerText;
-            // A video is recorded by its checksum; spelling out millions of bytes would only slow the fake down.
+            // A video or a large image is recorded by its checksum; spelling out millions of bytes would only slow the fake down.
             const hex = (buffer) => Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, '0')).join('');
-            const images = await Promise.all(files.map(async (file, index) => file.type.startsWith('video/')
-              ? { filename: file.name, mimeType: file.type, bytes: file.size, alt: '',
+            const images = await Promise.all(files.map(async (file, index) => file.type.startsWith('video/') || file.size > 65536
+              ? { filename: file.name, mimeType: file.type, bytes: file.size, alt: file.type.startsWith('video/') ? '' : alts[index] || '',
                   sha256: hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())) }
               : { filename: file.name, mimeType: file.type, bytes: file.size,
                   data: Array.from(new Uint8Array(await file.arrayBuffer())), alt: alts[index] || '' }));

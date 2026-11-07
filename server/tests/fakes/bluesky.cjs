@@ -76,7 +76,9 @@ module.exports = async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/xrpc/com.atproto.repo.uploadBlob') {
     const mimeType = req.headers['content-type'];
     if (!['image/png','image/jpeg','image/webp'].includes(mimeType)) return send(res, 400, { error: 'InvalidMimeType' });
-    const blob = { $type: 'blob', ref: { $link: 'bafyfixture' + blobs.length }, mimeType, size: Buffer.isBuffer(body) ? body.length : String(body).length };
+    // app.bsky.embed.images takes image blobs of at most 2,000,000 bytes.
+    if (!Buffer.isBuffer(body) || body.length > 2000000) return send(res, 400, { error: 'BlobTooLarge' });
+    const blob = { $type: 'blob', ref: { $link: 'bafyfixture' + blobs.length }, mimeType, size: body.length, sha256: createHash('sha256').update(body).digest('hex') };
     blobs.push(blob); await state.set('bluesky.blobs', blobs);
     return send(res, 200, { blob });
   }

@@ -87,6 +87,16 @@ test('publishes a video of several MiB, whose base64 runs to millions of charact
   });
 });
 
+test('publishes an image of X\'s full 5 MB, whose base64 runs to millions of characters', async () => {
+  await withFixture({}, async (input, fixture) => {
+    const large = Buffer.concat([imageBytes, Buffer.alloc(5 * 1000 * 1000 - imageBytes.length, 9)]);
+    const result = await runWorker({ ...input, images: [{ ...input.images[0], data: large.toString('base64') }] });
+    assert.equal(result.status, 'published');
+    assert.equal(fixture.posts[0].images[0].bytes, large.length);
+    assert.equal(fixture.posts[0].images[0].sha256, createHash('sha256').update(large).digest('hex'));
+  });
+});
+
 test('keeps emoji and symbols that start a line in place', async () => {
   await withFixture({}, async (input, fixture) => {
     const request = { ...input, text: 'Launch 🚀\n\n✅ one\n→ two\n\nthree ✅' };
@@ -258,7 +268,7 @@ for (const failure of ['mismatched-text', 'mismatched-media']) {
 
 test('invalid image boundaries fail before a browser submission', async () => {
   await withFixture({}, async (input, fixture) => {
-    const result = await runWorker({ ...input, images: [{ ...input.images[0], data: Buffer.alloc(1024 * 1024 + 1).toString('base64') }] });
+    const result = await runWorker({ ...input, images: [{ ...input.images[0], data: Buffer.alloc(5 * 1000 * 1000 + 1).toString('base64') }] });
     assert.equal(result.status, 'failed');
     assert.equal(fixture.posts.length, 0);
   });

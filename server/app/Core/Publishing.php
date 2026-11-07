@@ -480,7 +480,19 @@ final readonly class Publishing
     private function send(string $id, string $platform, string $text): array
     {
         try {
-            return $this->publishers[$platform]->publish($id, $text, $this->images($id), $this->video($id));
+            // Each site gets the images shrunk to its own limits, so callers send them as they are.
+            $images = array_map(static fn(ImageAttachment $image): ImageAttachment => ImageFit::forSite(
+                $image,
+                Platforms::IMAGE_LIMITS[$platform],
+            ), $this->images($id));
+            return $this->publishers[$platform]->publish($id, $text, $images, $this->video($id));
+        } catch (Failure $failure) {
+            // Raised before the site is contacted, so nothing was posted.
+            return [
+                'platform' => $platform,
+                'status' => 'failed',
+                'error' => $failure->getMessage() . ' Nothing was posted.',
+            ];
         } catch (\Throwable) {
             return [
                 'platform' => $platform,

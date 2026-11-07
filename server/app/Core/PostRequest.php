@@ -12,7 +12,9 @@ use App\Social\VideoAttachment;
 final readonly class PostRequest
 {
     public const int MAX_IMAGES = 4;
-    public const int MAX_IMAGE_BYTES = 1_048_576;
+    // Four images this size arrive as about 27 MiB of base64, within the server's body limit and a 128 MB PHP worker.
+    // Each site still gets an image shrunk to its own limit when it is sent (see ImageFit).
+    public const int MAX_IMAGE_BYTES = 5_242_880;
     // A video this size, sent as base64 in JSON and decoded, still fits a 128 MB PHP worker.
     public const int MAX_VIDEO_BYTES = 20_971_520;
     public const array MODES = ['now', 'draft', 'schedule'];
@@ -77,7 +79,7 @@ final readonly class PostRequest
                 throw Failure::invalid(
                     $kind === 'video'
                         ? 'The video ' . basename($path) . ' exceeds 20 MiB. Compress it first.'
-                        : 'The image ' . basename($path) . ' exceeds 1 MiB. Resize it first.',
+                        : 'The image ' . basename($path) . ' exceeds 5 MiB. Resize it first.',
                 );
             }
             return (string) file_get_contents($path);
@@ -86,13 +88,13 @@ final readonly class PostRequest
 
     private static function decode(array $upload, string $kind): string
     {
-        $limit = $kind === 'video' ? '20 MiB' : '1 MiB';
+        $limit = $kind === 'video' ? '20 MiB' : '5 MiB';
         if (
             !is_string($upload['data'] ?? null)
             || strlen($upload['data']) > (4 * intdiv(self::maxBytes($kind) + 2, 3))
         ) {
             throw Failure::invalid(
-                $kind === 'video' ? 'The video must be at most 20 MiB.' : 'Each image must be at most 1 MiB.',
+                $kind === 'video' ? 'The video must be at most 20 MiB.' : 'Each image must be at most 5 MiB.',
             );
         }
         $bytes = base64_decode($upload['data'], true);
@@ -117,6 +119,14 @@ final readonly class PostRequest
         $platforms = $data['platforms'] ?? null;
         $uploads = $data['images'] ?? [];
         $videoUpload = $data['video'] ?? null;
+        // Agents fill an unused video field with empty data; that is no video, not a video beside images.
+        if (
+            is_array($videoUpload)
+            && ($videoUpload['data'] ?? null) === ''
+            && ($videoUpload['path'] ?? null) === null
+        ) {
+            $videoUpload = null;
+        }
         $mode = $data['mode'] ?? (($data['scheduledAt'] ?? null) !== null ? 'schedule' : 'now');
         if (
             !is_string($requestId)
@@ -260,7 +270,7 @@ final readonly class PostRequest
     {
         $alt = $upload['alt'] ?? '';
         if ($bytes === '' || strlen($bytes) > self::MAX_IMAGE_BYTES) {
-            throw Failure::invalid('The image data is invalid or exceeds 1 MiB.');
+            throw Failure::invalid('The image data is invalid or exceeds 5 MiB.');
         }
         if (!is_string($alt) || mb_strlen($alt) > 1000) {
             throw Failure::invalid('Image descriptions must contain at most 1,000 characters.');

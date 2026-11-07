@@ -7,7 +7,9 @@
         "crabphp/framework": "^0.6",
         "ext-openssl": "*",
         "ext-pdo_sqlite": "*",
-        "ext-iconv": "*"
+        "ext-iconv": "*",
+        "ext-gd": "*",
+        "ext-exif": "*"
     },
     "require-dev": {
         "carthage-software/mago": "1.57.0"
