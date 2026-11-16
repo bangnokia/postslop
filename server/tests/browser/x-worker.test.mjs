@@ -123,6 +123,20 @@ test('stops with nothing posted when X never finishes processing a video', async
   });
 });
 
+test('describes each of several images, whose Edit buttons open X on the crop tab', async () => {
+  await withFixture({}, async (input, fixture) => {
+    const webp = Buffer.from('UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==', 'base64');
+    const images = [
+      { filename: 'first.webp', mimeType: 'image/webp', data: webp.toString('base64'), alt: 'The first screen' },
+      { filename: 'second.webp', mimeType: 'image/webp', data: webp.toString('base64'), alt: 'The second screen' },
+    ];
+    const result = await runWorker({ ...input, images });
+    assert.equal(result.status, 'published');
+    assert.deepEqual(fixture.posts[0].images.map((image) => [image.mimeType, image.alt]),
+      [['image/webp', 'The first screen'], ['image/webp', 'The second screen']]);
+  });
+});
+
 test('refuses images beside a video, and a video that is not MP4 or MOV, before opening X', async () => {
   await withFixture({}, async (input, fixture) => {
     assert.equal((await runWorker({ ...withVideo(input), images: input.images })).code, 'invalid_request');

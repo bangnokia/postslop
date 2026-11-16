@@ -26,7 +26,11 @@ export function xFixture({ handle = 'bangnokia', failure = null, prefix = '' } =
         <div data-testid="attachments" hidden></div>
         <a href="${prefix}/compose/post/media" id="description" hidden>Add description</a>
         <div id="editor" role="dialog" hidden>
-          <label>Description<textarea id="alt"></textarea></label>
+          <div role="tablist">
+            <button role="tab" id="crop-tab">Crop media</button>
+            <button role="tab" id="alt-tab" aria-label="Edit image description">ALT</button>
+          </div>
+          <label id="alt-panel">Alt text<textarea id="alt"></textarea></label>
           <button id="save">Save</button>
         </div>
         <button data-testid="tweetButton">Post</button>
@@ -39,24 +43,34 @@ export function xFixture({ handle = 'bangnokia', failure = null, prefix = '' } =
           const attachments = composer.querySelector('[data-testid="attachments"]');
           const editor = document.querySelector('#editor');
           const alt = document.querySelector('#alt');
-          function edit(index) { activeImage = index; alt.value = alts[index] || ''; editor.hidden = false; }
+          // Like X, the description link opens the ALT tab, and an image's Edit button opens the crop tab.
+          function tab(name) {
+            document.querySelector('#crop-tab').setAttribute('aria-selected', String(name === 'crop'));
+            document.querySelector('#alt-tab').setAttribute('aria-selected', String(name === 'alt'));
+            document.querySelector('#alt-panel').hidden = name !== 'alt';
+          }
+          function edit(index, name) { activeImage = index; alt.value = alts[index] || ''; tab(name); editor.hidden = false; }
+          document.querySelector('#crop-tab').onclick = () => tab('crop');
+          document.querySelector('#alt-tab').onclick = () => tab('alt');
           const postButton = composer.querySelector('[data-testid="tweetButton"]');
           composer.querySelector('input').onchange = (event) => {
             files = Array.from(event.target.files); attachments.hidden = false;
             const video = files.some((file) => file.type.startsWith('video/'));
             // Like X, a video has no description link, and Post waits until the upload is processed.
             document.querySelector('#description').hidden = video;
+            // X names the link for several images "Add descriptions".
+            document.querySelector('#description').textContent = files.length > 1 ? 'Add descriptions' : 'Add description';
             if (video) {
               postButton.disabled = true;
               if (${JSON.stringify(failure)} !== 'video-stuck') setTimeout(() => { postButton.disabled = false; }, 700);
             }
             attachments.replaceChildren(...files.map((file, index) => {
               const editButton = document.createElement('button');
-              editButton.textContent = 'Edit media'; editButton.onclick = () => edit(index);
+              editButton.textContent = 'Edit media'; editButton.onclick = () => edit(index, 'crop');
               return editButton;
             }));
           };
-          document.querySelector('#description').onclick = (event) => { event.preventDefault(); edit(0); };
+          document.querySelector('#description').onclick = (event) => { event.preventDefault(); edit(0, 'alt'); };
           document.querySelector('#save').onclick = () => { alts[activeImage] = alt.value; editor.hidden = true; };
           composer.querySelector('[data-testid="tweetButton"]').onclick = async () => {
             const text = composer.querySelector('[data-testid="tweetTextarea_0"]').innerText;

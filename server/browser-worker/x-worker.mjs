@@ -210,9 +210,12 @@ async function addImages(page, composerDialog, input) {
     const descriptionLink = composerDialog.getByRole('link', { name: 'Add description', exact: true });
     if (index === 0 && await descriptionLink.isVisible()) await descriptionLink.click();
     else await previews.getByRole('button', { name: /^(Edit image|Edit media|Edit)$/i }).nth(index).click();
-    const descriptionTab = page.getByRole('tab', { name: /^(Alt text|Add description)$/i });
-    if (await descriptionTab.isVisible()) await descriptionTab.click();
+    // With several images X offers no single "Add description" link, and an image's Edit button opens the crop tab;
+    // its alt text tab, shown as ALT, is named "Edit image description".
+    const descriptionTab = page.getByRole('tab', { name: /^(Alt text|Add description|Edit image description)$/i });
     const description = page.getByRole('textbox', { name: /^(Description|Alt text|Image description|Add description)$/i });
+    await description.or(descriptionTab).first().waitFor({ state: 'visible' });
+    if (!await description.isVisible()) await descriptionTab.click();
     await description.fill(attachment.alt);
     await page.getByRole('button', { name: /^(Save|Done)$/i }).last().click();
     await description.waitFor({ state: 'hidden' });
